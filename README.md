@@ -27,7 +27,7 @@ A learning management and online assessment system for academic education. This 
 1. Clone the project
 
 ```bash
-git clone https://github.com/nz-m/eLMS-SWE.git
+git clone https://github.com/utsav210/e-Learning-Management-System.git
 ```
 
 2. Go to the project directory
