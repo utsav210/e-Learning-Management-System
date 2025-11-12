@@ -55,4 +55,100 @@
       {% endif %}
    </div>
 </div>
+
+<!-- Email Popup Modal (shown on first login if email not set) -->
+{% if show_email_popup %}
+<div class="modal fade show" id="emailModal" tabindex="-1" aria-labelledby="emailModalLabel" aria-hidden="false" style="display: block; background-color: rgba(0,0,0,0.5);">
+   <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+         <div class="modal-header bg-primary text-white">
+            <h5 class="modal-title" id="emailModalLabel">
+               <span class="material-symbols-outlined me-2">email</span>
+               Add Your Email Address
+            </h5>
+         </div>
+         <div class="modal-body">
+            <p class="text-muted">Please provide your email address to enable password reset functionality and receive important notifications.</p>
+            <form id="emailForm">
+               {% csrf_token %}
+               <div class="mb-3">
+                  <label for="email" class="form-label">Email Address <span class="text-danger">*</span></label>
+                  <input type="email" class="form-control" id="email" name="email" required placeholder="Enter your email address">
+                  <div class="form-text">This email will be used for password recovery and notifications.</div>
+               </div>
+               <div id="emailError" class="alert alert-danger d-none" role="alert"></div>
+               <div id="emailSuccess" class="alert alert-success d-none" role="alert"></div>
+            </form>
+         </div>
+         <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" id="skipEmailBtn">Skip for now</button>
+            <button type="button" class="btn btn-primary" id="saveEmailBtn">Save Email</button>
+         </div>
+      </div>
+   </div>
+</div>
+{% endif %}
+
+<script>
+{% if show_email_popup %}
+$(document).ready(function() {
+   $('#emailModal').modal('show');
+   $('#emailModal').on('hidden.bs.modal', function () {
+      // Clear the session flag when modal is closed
+      $.post('{% url "saveEmail" %}', {
+         csrfmiddlewaretoken: '{{ csrf_token }}',
+         skip: true
+      });
+   });
+   
+   $('#saveEmailBtn').click(function() {
+      const email = $('#email').val().trim();
+      const errorDiv = $('#emailError');
+      const successDiv = $('#emailSuccess');
+      
+      errorDiv.addClass('d-none');
+      successDiv.addClass('d-none');
+      
+      if (!email) {
+         errorDiv.text('Please enter your email address.').removeClass('d-none');
+         return;
+      }
+      
+      // Validate email format
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+         errorDiv.text('Please enter a valid email address.').removeClass('d-none');
+         return;
+      }
+      
+      $.ajax({
+         url: '{% url "saveEmail" %}',
+         method: 'POST',
+         data: {
+            csrfmiddlewaretoken: '{{ csrf_token }}',
+            email: email
+         },
+         success: function(response) {
+            if (response.success) {
+               successDiv.text(response.message).removeClass('d-none');
+               setTimeout(function() {
+                  $('#emailModal').modal('hide');
+                  location.reload();
+               }, 1500);
+            } else {
+               errorDiv.text(response.message).removeClass('d-none');
+            }
+         },
+         error: function() {
+            errorDiv.text('An error occurred. Please try again.').removeClass('d-none');
+         }
+      });
+   });
+   
+   $('#skipEmailBtn').click(function() {
+      $('#emailModal').modal('hide');
+   });
+});
+{% endif %}
+</script>
 {% endblock %}

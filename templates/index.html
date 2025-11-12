@@ -12,6 +12,7 @@
       <link rel="manifest" href="{% static 'images/icon/site.webmanifest' %}">
       <link rel="stylesheet" href="{% static 'styles/bootstrap.min.css' %}">
       <link rel="stylesheet" href="{% static 'styles/style.css' %}">
+      <link rel="stylesheet" href="{% static 'styles/theme-edu.css' %}">
       <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@48,400,0,0" />
       <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js" integrity="sha512-z4OUqw38qNLpn1libAN9BsoDx6nbNFio5lA6CuTp9NlK83b89hgyCVq+N5FdBJptINztxn1Z3SaKSKUS5UP60Q==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
       <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js" integrity="sha512-894YE6QWD5I59HgZOGReFYm4dnWc1Qt5NtvYSaNcOP+u1T9qYdvdihz0PPSiiqn/+/3e7Jo4EaG7TubfWGUrMQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
@@ -49,7 +50,7 @@
                   <li class="nav-item">
                      <a class="nav-link active fw-bold" href="{% block profile %}{% endblock profile %}"
                         data-bs-toggle="tooltip" data-bs-placement="bottom"
-                        title="Check your profile">{% block user %}{% endblock  %}</a>
+                        title="Check your profile" id="profile-link">{% block user %}{% endblock  %}</a>
                   </li>
                </ul>
                <form class="d-flex" action=" {% url 'search' %}" method="GET">
@@ -64,5 +65,23 @@
       {% block  content %}
       {% endblock  %}
       <script src=" {% static 'js/bootstrap.bundle.min.js' %} "></script>
+      <script>
+         // Debug profile link
+         document.addEventListener('DOMContentLoaded', function() {
+            const profileLink = document.getElementById('profile-link');
+            if (profileLink) {
+               console.log('Profile link found:', profileLink.href);
+               console.log('Profile link text:', profileLink.textContent);
+               
+               // Add click event listener for debugging
+               profileLink.addEventListener('click', function(e) {
+                  console.log('Profile link clicked, href:', this.href);
+                  // Let the default behavior proceed
+               });
+            } else {
+               console.log('Profile link not found');
+            }
+         });
+      </script>
    </body>
 </html>

@@ -24,14 +24,19 @@
                      <h5 class="mb-3 fw-bold">Change Profile Picture</h5>
                   </div>
                   <div class="my-3 text-center">
-                     <img src="/media/{{faculty.photo}}" alt="image" class="rounded-circle" style="height: 10rem ; width:10rem">
-                  </div>
-                  <div class="mb-3">
-                     <label for="photo" class="form-label ">Photo</label>
-                     <input type="file" class="form-control" id="photo" name="photo" required>
+                     <div class="position-relative d-inline-block">
+                        <img id="profilePreview" src="/media/{{faculty.photo}}" alt="Profile photo" class="rounded-circle border" style="height: 10rem ; width:10rem; object-fit: cover;">
+                        <button type="button" id="cameraTrigger" aria-label="Change photo" class="btn btn-light border rounded-circle p-2 position-absolute" style="bottom: 0.25rem; right: 0.25rem;">
+                           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
+                              <path d="M10.5 8a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0"/>
+                              <path d="M2 4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-1.172a2 2 0 0 1-1.414-.586l-.828-.828A2 2 0 0 0 8.172 2H7.828a2 2 0 0 0-1.414.586l-.828.828A2 2 0 0 1 4.172 4zM8 5a4 4 0 1 1 0 8A4 4 0 0 1 8 5"/>
+                           </svg>
+                        </button>
+                        <input type="file" class="d-none" id="photo" name="photo" accept="image/*" required>
+                     </div>
                   </div>
                   <div class="d-grid">
-                     <button type="submit" class="btn btn-primary">Submit</button>
+                     <button type="submit" class="btn btn-primary">Save</button>
                   </div>
                   <div class="text-center mt-3">
                      <a href="{% url 'profile' faculty.faculty_id %}">Cancel</a>
@@ -51,15 +56,23 @@
       <script src=" {% static 'js/bootstrap.bundle.min.js' %} "></script>
       <script>
          $(document).ready(function(){
-              $('#photo').change(function(){
+             $('#cameraTrigger').on('click', function(){
+                $('#photo').trigger('click');
+             });
+
+             $('#photo').change(function(){
                 var file = this.files[0];
+                if (!file) { return; }
                 var fileType = file["type"];
-                var ValidImageTypes = ["image/gif", "image/jpeg", "image/png"];
+                var ValidImageTypes = ["image/gif", "image/jpeg", "image/png", "image/webp"];
                 if ($.inArray(fileType, ValidImageTypes) < 0) {
                      alert("Please select a valid image file (jpg, jpeg, png, gif).");
                      $('#photo').val('');
                      return false;
                 }
+                // Preview selected image
+                const url = URL.createObjectURL(file);
+                $('#profilePreview').attr('src', url);
               });
          });
       </script>

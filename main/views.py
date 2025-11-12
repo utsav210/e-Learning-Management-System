@@ -1,40 +1,91 @@
 import datetime
+import logging
 from django.shortcuts import redirect, render
 from django.contrib import messages
-from .models import Student, Course, Announcement, Assignment, Submission, Material, Faculty, Department
+from .models import Student, Course, Announcement, Assignment, Submission, Material, Faculty, Department, PasswordResetOTP
 from django.template.defaulttags import register
 from django.db.models import Count, Q
-from django.http import HttpResponseRedirect
+from django.http import HttpResponseRedirect, Http404, JsonResponse
+from django.utils import timezone
+from django.utils.http import url_has_allowed_host_and_scheme
 from .forms import AnnouncementForm, AssignmentForm, MaterialForm
 from django import forms
 from django.core import validators
+from django.contrib.auth.hashers import make_password, check_password
+from django.core.exceptions import ObjectDoesNotExist, ValidationError
+from django.views.decorators.http import require_http_methods, require_GET, require_POST
+from django.views.decorators.csrf import csrf_protect
+from django.views.decorators.cache import never_cache
+from django.core.mail import send_mail
+from django.conf import settings
+import random
+import smtplib
+from datetime import timedelta
 
-
-from django import forms
+# Configure logging
+logger = logging.getLogger(__name__)
 
 
 class LoginForm(forms.Form):
-    id = forms.CharField(label='ID', max_length=10, validators=[
-                         validators.RegexValidator(r'^\d+$', 'Please enter a valid number.')])
-    password = forms.CharField(widget=forms.PasswordInput)
+    username = forms.CharField(
+        label='Username', 
+        max_length=100, 
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Enter your username'})
+    )
+    password = forms.CharField(
+        widget=forms.PasswordInput(attrs={'class': 'form-control', 'placeholder': 'Enter your password'}),
+        min_length=1,
+        max_length=255
+    )
+    
+    def clean_username(self):
+        username = self.cleaned_data.get('username')
+        if username:
+            # Basic username validation
+            if len(username.strip()) == 0:
+                raise forms.ValidationError('Username cannot be empty')
+        return username
+    
+    def clean_password(self):
+        password = self.cleaned_data.get('password')
+        if password:
+            # Basic password validation
+            if len(password.strip()) == 0:
+                raise forms.ValidationError('Password cannot be empty')
+        return password
 
 
 def is_student_authorised(request, code):
-    course = Course.objects.get(code=code)
-    if request.session.get('student_id') and course in Student.objects.get(student_id=request.session['student_id']).course.all():
-        return True
-    else:
+    try:
+        course = Course.objects.get(code=code)
+        if request.session.get('student_id'):
+            student = Student.objects.get(student_id=request.session['student_id'])
+            return course in student.course.all()
+        return False
+    except (ObjectDoesNotExist, KeyError) as e:
+        logger.warning(f"Authorization check failed for student: {e}")
         return False
 
 
 def is_faculty_authorised(request, code):
-    if request.session.get('faculty_id') and code in Course.objects.filter(faculty_id=request.session['faculty_id']).values_list('code', flat=True):
-        return True
-    else:
+    try:
+        if request.session.get('faculty_id'):
+            faculty_id = request.session['faculty_id']
+            # Authorize if the faculty is directly assigned OR matches via facultyKey
+            faculty_courses = Course.objects.filter(
+                Q(faculty_id=faculty_id) | Q(faculty__isnull=True, facultyKey=faculty_id)
+            ).values_list('code', flat=True)
+            return code in faculty_courses
+        return False
+    except (ObjectDoesNotExist, KeyError) as e:
+        logger.warning(f"Authorization check failed for faculty: {e}")
         return False
 
 
 # Custom Login page for both student and faculty
+@never_cache
+@csrf_protect
+@require_http_methods(["GET", "POST"])
 def std_login(request):
     error_messages = []
 
@@ -42,17 +93,33 @@ def std_login(request):
         form = LoginForm(request.POST)
 
         if form.is_valid():
-            id = form.cleaned_data['id']
+            username = form.cleaned_data['username']
             password = form.cleaned_data['password']
 
-            if Student.objects.filter(student_id=id, password=password).exists():
-                request.session['student_id'] = id
-                return redirect('myCourses')
-            elif Faculty.objects.filter(faculty_id=id, password=password).exists():
-                request.session['faculty_id'] = id
-                return redirect('facultyCourses')
-            else:
-                error_messages.append('Invalid login credentials.')
+            # Check student login - working with plaintext passwords
+            try:
+                student = Student.objects.get(name=username)
+                # Direct comparison for plaintext passwords
+                if student.password == password:
+                    request.session['student_id'] = student.student_id
+                    # Check if email is set, if not, mark for popup
+                    if not student.email:
+                        request.session['show_email_popup'] = True
+                    return redirect('myCourses')
+            except Student.DoesNotExist:
+                pass
+            
+            # Check faculty login - working with plaintext passwords
+            try:
+                faculty = Faculty.objects.get(name=username)
+                # Direct comparison for plaintext passwords
+                if faculty.password == password:
+                    request.session['faculty_id'] = faculty.faculty_id
+                    return redirect('facultyCourses')
+            except Faculty.DoesNotExist:
+                pass
+            
+            error_messages.append('Invalid login credentials.')
         else:
             error_messages.append('Invalid form data.')
     else:
@@ -66,44 +133,57 @@ def std_login(request):
     context = {'form': form, 'error_messages': error_messages}
     return render(request, 'login_page.html', context)
 
+
 # Clears the session on logout
-
-
+@never_cache
+@csrf_protect
+@require_http_methods(["GET", "POST"])
 def std_logout(request):
     request.session.flush()
     return redirect('std_login')
 
 
 # Display all courses (student view)
+@require_GET
 def myCourses(request):
     try:
         if request.session.get('student_id'):
-            student = Student.objects.get(
-                student_id=request.session['student_id'])
+            student = Student.objects.get(student_id=request.session['student_id'])
             courses = student.course.all()
             faculty = student.course.all().values_list('faculty_id', flat=True)
+            
+            # Check if email popup should be shown
+            show_email_popup = request.session.get('show_email_popup', False) and not student.email
 
             context = {
                 'courses': courses,
                 'student': student,
-                'faculty': faculty
+                'faculty': faculty,
+                'show_email_popup': show_email_popup
             }
 
             return render(request, 'main/myCourses.html', context)
         else:
             return redirect('std_login')
-    except:
+    except ObjectDoesNotExist:
+        logger.error(f"Student not found: {request.session.get('student_id')}")
+        messages.error(request, 'Student account not found. Please contact administrator.')
+        return redirect('std_login')
+    except Exception as e:
+        logger.error(f"Error in myCourses: {str(e)}")
         return render(request, 'error.html')
 
 
 # Display all courses (faculty view)
+@require_GET
 def facultyCourses(request):
     try:
-        if request.session['faculty_id']:
-            faculty = Faculty.objects.get(
-                faculty_id=request.session['faculty_id'])
+        if request.session.get('faculty_id'):
+            faculty = Faculty.objects.get(faculty_id=request.session['faculty_id'])
+            # Include courses explicitly assigned to this faculty and those pending assignment but matching the facultyKey
             courses = Course.objects.filter(
-                faculty_id=request.session['faculty_id'])
+                Q(faculty_id=request.session['faculty_id']) | Q(faculty__isnull=True, facultyKey=request.session['faculty_id'])
+            )
             # Student count of each course to show on the faculty page
             studentCount = Course.objects.all().annotate(student_count=Count('students'))
 
@@ -123,26 +203,29 @@ def facultyCourses(request):
             }
 
             return render(request, 'main/facultyCourses.html', context)
-
         else:
             return redirect('std_login')
-    except:
-
+    except ObjectDoesNotExist:
+        logger.error(f"Faculty not found: {request.session.get('faculty_id')}")
+        messages.error(request, 'Faculty account not found. Please contact administrator.')
+        return redirect('std_login')
+    except Exception as e:
+        logger.error(f"Error in facultyCourses: {str(e)}")
         return redirect('std_login')
 
 
 # Particular course page (student view)
+@require_GET
 def course_page(request, code):
     try:
         course = Course.objects.get(code=code)
         if is_student_authorised(request, code):
             try:
                 announcements = Announcement.objects.filter(course_code=course)
-                assignments = Assignment.objects.filter(
-                    course_code=course.code)
+                assignments = Assignment.objects.filter(course_code=course.code)
                 materials = Material.objects.filter(course_code=course.code)
-
-            except:
+            except Exception as e:
+                logger.warning(f"Error loading course content: {e}")
                 announcements = None
                 assignments = None
                 materials = None
@@ -150,20 +233,24 @@ def course_page(request, code):
             context = {
                 'course': course,
                 'announcements': announcements,
-                'assignments': assignments[:3],
+                'assignments': assignments[:3] if assignments else [],
                 'materials': materials,
                 'student': Student.objects.get(student_id=request.session['student_id'])
             }
 
             return render(request, 'main/course.html', context)
-
         else:
             return redirect('std_login')
-    except:
+    except ObjectDoesNotExist:
+        logger.error(f"Course not found: {code}")
+        raise Http404("Course not found")
+    except Exception as e:
+        logger.error(f"Error in course_page: {str(e)}")
         return render(request, 'error.html')
 
 
 # Particular course page (faculty view)
+@require_GET
 def course_page_faculty(request, code):
     course = Course.objects.get(code=code)
     if request.session.get('faculty_id'):
@@ -193,29 +280,32 @@ def course_page_faculty(request, code):
         return redirect('std_login')
 
 
+@require_GET
 def error(request):
     return render(request, 'error.html')
 
 
 # Display user profile(student & faculty)
+@require_GET
 def profile(request, id):
     try:
-        if request.session['student_id'] == id:
+        # Check if student is logged in and ID matches
+        if request.session.get('student_id') and str(request.session['student_id']) == str(id):
             student = Student.objects.get(student_id=id)
             return render(request, 'main/profile.html', {'student': student})
+        # Check if faculty is logged in and ID matches
+        elif request.session.get('faculty_id') and str(request.session['faculty_id']) == str(id):
+            faculty = Faculty.objects.get(faculty_id=id)
+            return render(request, 'main/faculty_profile.html', {'faculty': faculty})
         else:
             return redirect('std_login')
-    except:
-        try:
-            if request.session['faculty_id'] == id:
-                faculty = Faculty.objects.get(faculty_id=id)
-                return render(request, 'main/faculty_profile.html', {'faculty': faculty})
-            else:
-                return redirect('std_login')
-        except:
-            return render(request, 'error.html')
+    except Exception as e:
+        logger.error(f"Error in profile view: {str(e)}")
+        return redirect('std_login')
 
 
+@csrf_protect
+@require_http_methods(["GET", "POST"])
 def addAnnouncement(request, code):
     if is_faculty_authorised(request, code):
         if request.method == 'POST':
@@ -233,6 +323,8 @@ def addAnnouncement(request, code):
         return redirect('std_login')
 
 
+@csrf_protect
+@require_POST
 def deleteAnnouncement(request, code, id):
     if is_faculty_authorised(request, code):
         try:
@@ -246,6 +338,7 @@ def deleteAnnouncement(request, code, id):
         return redirect('std_login')
 
 
+@require_GET
 def editAnnouncement(request, code, id):
     if is_faculty_authorised(request, code):
         announcement = Announcement.objects.get(course_code_id=code, id=id)
@@ -261,6 +354,8 @@ def editAnnouncement(request, code, id):
         return redirect('std_login')
 
 
+@csrf_protect
+@require_POST
 def updateAnnouncement(request, code, id):
     if is_faculty_authorised(request, code):
         try:
@@ -277,6 +372,8 @@ def updateAnnouncement(request, code, id):
         return redirect('std_login')
 
 
+@csrf_protect
+@require_http_methods(["GET", "POST"])
 def addAssignment(request, code):
     if is_faculty_authorised(request, code):
         if request.method == 'POST':
@@ -293,6 +390,7 @@ def addAssignment(request, code):
         return redirect('std_login')
 
 
+@require_GET
 def assignmentPage(request, code, id):
     course = Course.objects.get(code=code)
     if is_student_authorised(request, code):
@@ -306,7 +404,7 @@ def assignmentPage(request, code, id):
                 'assignment': assignment,
                 'course': course,
                 'submission': submission,
-                'time': datetime.datetime.now(),
+                'time': timezone.now(),
                 'student': Student.objects.get(student_id=request.session['student_id']),
                 'courses': Student.objects.get(student_id=request.session['student_id']).course.all()
             }
@@ -320,7 +418,7 @@ def assignmentPage(request, code, id):
             'assignment': assignment,
             'course': course,
             'submission': submission,
-            'time': datetime.datetime.now(),
+            'time': timezone.now(),
             'student': Student.objects.get(student_id=request.session['student_id']),
             'courses': Student.objects.get(student_id=request.session['student_id']).course.all()
         }
@@ -331,6 +429,7 @@ def assignmentPage(request, code, id):
         return redirect('std_login')
 
 
+@require_GET
 def allAssignments(request, code):
     if is_faculty_authorised(request, code):
         course = Course.objects.get(code=code)
@@ -349,6 +448,7 @@ def allAssignments(request, code):
         return redirect('std_login')
 
 
+@require_GET
 def allAssignmentsSTD(request, code):
     if is_student_authorised(request, code):
         course = Course.objects.get(code=code)
@@ -364,13 +464,15 @@ def allAssignmentsSTD(request, code):
         return redirect('std_login')
 
 
+@csrf_protect
+@require_http_methods(["GET", "POST"])
 def addSubmission(request, code, id):
     try:
         course = Course.objects.get(code=code)
         if is_student_authorised(request, code):
             # check if assignment is open
             assignment = Assignment.objects.get(course_code=course.code, id=id)
-            if assignment.deadline < datetime.datetime.now():
+            if assignment.deadline < timezone.now():
 
                 return redirect('/assignment/' + str(code) + '/' + str(id))
 
@@ -391,7 +493,7 @@ def addSubmission(request, code, id):
                     'assignment': assignment,
                     'course': course,
                     'submission': submission,
-                    'time': datetime.datetime.now(),
+                    'time': timezone.now(),
                     'student': Student.objects.get(student_id=request.session['student_id']),
                     'courses': Student.objects.get(student_id=request.session['student_id']).course.all()
                 }
@@ -403,6 +505,7 @@ def addSubmission(request, code, id):
         return HttpResponseRedirect(request.path_info)
 
 
+@require_GET
 def viewSubmission(request, code, id):
     course = Course.objects.get(code=code)
     if is_faculty_authorised(request, code):
@@ -428,6 +531,8 @@ def viewSubmission(request, code, id):
         return redirect('std_login')
 
 
+@csrf_protect
+@require_http_methods(["GET", "POST"])
 def gradeSubmission(request, code, id, sub_id):
     try:
         course = Course.objects.get(code=code)
@@ -467,6 +572,8 @@ def gradeSubmission(request, code, id, sub_id):
         return redirect('/error/')
 
 
+@csrf_protect
+@require_http_methods(["GET", "POST"])
 def addCourseMaterial(request, code):
     if is_faculty_authorised(request, code):
         if request.method == 'POST':
@@ -485,6 +592,8 @@ def addCourseMaterial(request, code):
         return redirect('std_login')
 
 
+@csrf_protect
+@require_POST
 def deleteCourseMaterial(request, code, id):
     if is_faculty_authorised(request, code):
         course = Course.objects.get(code=code)
@@ -496,6 +605,7 @@ def deleteCourseMaterial(request, code, id):
         return redirect('std_login')
 
 
+@require_GET
 def courses(request):
     if request.session.get('student_id') or request.session.get('faculty_id'):
 
@@ -529,6 +639,7 @@ def courses(request):
         return redirect('std_login')
 
 
+@require_GET
 def departments(request):
     if request.session.get('student_id') or request.session.get('faculty_id'):
         departments = Department.objects.all()
@@ -554,6 +665,8 @@ def departments(request):
         return redirect('std_login')
 
 
+@csrf_protect
+@require_http_methods(["GET", "POST"])
 def access(request, code):
     if request.session.get('student_id'):
         course = Course.objects.get(code=code)
@@ -573,10 +686,11 @@ def access(request, code):
         return redirect('std_login')
 
 
+@require_GET
 def search(request):
     if request.session.get('student_id') or request.session.get('faculty_id'):
-        if request.method == 'GET' and request.GET['q']:
-            q = request.GET['q']
+        q = request.GET.get('q')
+        if q and q.strip():  # Check if query exists and is not empty/whitespace
             courses = Course.objects.filter(Q(code__icontains=q) | Q(
                 name__icontains=q) | Q(faculty__name__icontains=q))
 
@@ -604,11 +718,16 @@ def search(request):
             }
             return render(request, 'main/search.html', context)
         else:
-            return HttpResponseRedirect(request.META.get('HTTP_REFERER'))
+            # No query parameter or empty query - redirect to safe default
+            referer = request.META.get('HTTP_REFERER')
+            if referer and url_has_allowed_host_and_scheme(referer, allowed_hosts=None):
+                return HttpResponseRedirect(referer)
+            return redirect('courses')
     else:
         return redirect('std_login')
 
 
+@require_GET
 def changePasswordPrompt(request):
     if request.session.get('student_id'):
         student = Student.objects.get(student_id=request.session['student_id'])
@@ -620,6 +739,7 @@ def changePasswordPrompt(request):
         return redirect('std_login')
 
 
+@require_GET
 def changePhotoPrompt(request):
     if request.session.get('student_id'):
         student = Student.objects.get(student_id=request.session['student_id'])
@@ -631,14 +751,20 @@ def changePhotoPrompt(request):
         return redirect('std_login')
 
 
+@csrf_protect
+@require_http_methods(["GET", "POST"])
 def changePassword(request):
     if request.session.get('student_id'):
         student = Student.objects.get(
             student_id=request.session['student_id'])
         if request.method == 'POST':
-            if student.password == request.POST['oldPassword']:
-                # New and confirm password check is done in the client side
-                student.password = request.POST['newPassword']
+            old_password = request.POST['oldPassword']
+            new_password = request.POST['newPassword']
+            
+            # Check old password - working with plaintext passwords
+            if student.password == old_password:
+                # Save new password as plaintext
+                student.password = new_password
                 student.save()
                 messages.success(request, 'Password was changed successfully')
                 return redirect('/profile/' + str(student.student_id))
@@ -652,19 +778,24 @@ def changePassword(request):
         return redirect('std_login')
 
 
+@csrf_protect
+@require_http_methods(["GET", "POST"])
 def changePasswordFaculty(request):
     if request.session.get('faculty_id'):
         faculty = Faculty.objects.get(
             faculty_id=request.session['faculty_id'])
         if request.method == 'POST':
-            if faculty.password == request.POST['oldPassword']:
-                # New and confirm password check is done in the client side
-                faculty.password = request.POST['newPassword']
+            old_password = request.POST['oldPassword']
+            new_password = request.POST['newPassword']
+            
+            # Check old password - working with plaintext passwords
+            if faculty.password == old_password:
+                # Save new password as plaintext
+                faculty.password = new_password
                 faculty.save()
                 messages.success(request, 'Password was changed successfully')
-                return redirect('/facultyProfile/' + str(faculty.faculty_id))
+                return redirect('profile', id=str(faculty.faculty_id))
             else:
-                print('error')
                 messages.error(
                     request, 'Password is incorrect. Please try again')
                 return redirect('/changePasswordFaculty/')
@@ -675,6 +806,8 @@ def changePasswordFaculty(request):
         return redirect('std_login')
 
 
+@csrf_protect
+@require_http_methods(["GET", "POST"])
 def changePhoto(request):
     if request.session.get('student_id'):
         student = Student.objects.get(
@@ -695,6 +828,8 @@ def changePhoto(request):
         return redirect('std_login')
 
 
+@csrf_protect
+@require_http_methods(["GET", "POST"])
 def changePhotoFaculty(request):
     if request.session.get('faculty_id'):
         faculty = Faculty.objects.get(
@@ -704,7 +839,7 @@ def changePhotoFaculty(request):
                 faculty.photo = request.FILES['photo']
                 faculty.save()
                 messages.success(request, 'Photo was changed successfully')
-                return redirect('/facultyProfile/' + str(faculty.faculty_id))
+                return redirect('profile', id=str(faculty.faculty_id))
             else:
                 messages.error(
                     request, 'Please select a photo')
@@ -715,6 +850,9 @@ def changePhotoFaculty(request):
         return redirect('std_login')
 
 
+@never_cache
+@csrf_protect
+@require_POST
 def guestStudent(request):
     request.session.flush()
     try:
@@ -725,6 +863,9 @@ def guestStudent(request):
         return redirect('std_login')
 
 
+@never_cache
+@csrf_protect
+@require_POST
 def guestFaculty(request):
     request.session.flush()
     try:
@@ -732,4 +873,344 @@ def guestFaculty(request):
         request.session['faculty_id'] = str(faculty.faculty_id)
         return redirect('facultyCourses')
     except:
+        return redirect('std_login')
+
+
+# Forgot Password Functionality
+def generate_otp():
+    """Generate a 6-digit OTP"""
+    return str(random.randint(100000, 999999))
+
+
+@csrf_protect
+@require_http_methods(["GET", "POST"])
+def forgotPassword(request):
+    """Request OTP for password reset - email only"""
+    if request.method == 'POST':
+        email = request.POST.get('email', '').strip()
+        
+        if not email:
+            messages.error(request, 'Please provide your email address.')
+            return render(request, 'main/forgotPassword.html')
+        
+        # Validate email format
+        from django.core.validators import validate_email
+        from django.core.exceptions import ValidationError
+        try:
+            validate_email(email)
+        except ValidationError:
+            messages.error(request, 'Please enter a valid email address.')
+            return render(request, 'main/forgotPassword.html')
+        
+        try:
+            # Find student by email only
+            students = Student.objects.filter(email=email)
+            
+            if not students.exists():
+                messages.error(request, 'No account found with the provided email address.')
+                return render(request, 'main/forgotPassword.html')
+            
+            # If multiple students have the same email, that's a data integrity issue
+            # For security, we'll only proceed if exactly one student has this email
+            if students.count() > 1:
+                logger.warning(f"Multiple students found with email: {email}")
+                messages.error(request, 'Multiple accounts found with this email. Please contact administrator.')
+                return render(request, 'main/forgotPassword.html')
+            
+            student = students.first()
+            
+            # Generate OTP
+            otp = generate_otp()
+            
+            # Invalidate previous OTPs for this student
+            PasswordResetOTP.objects.filter(student=student, is_used=False).update(is_used=True)
+            
+            # Create new OTP
+            otp_obj = PasswordResetOTP.objects.create(
+                student=student,
+                email=email,
+                otp=otp
+            )
+            
+            # Send OTP email
+            try:
+                send_mail(
+                    subject='Password Reset OTP - eLMS',
+                    message=f'''Hello {student.name},
+
+You have requested to reset your password for your eLMS account.
+
+Your OTP (One-Time Password) is: {otp}
+
+This OTP is valid for {getattr(settings, 'OTP_EXPIRY_MINUTES', 10)} minutes.
+
+If you did not request this password reset, please ignore this email.
+
+Best regards,
+eLMS Team''',
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    recipient_list=[email],
+                    fail_silently=False,
+                )
+                messages.success(request, f'OTP has been sent to your email: {email}')
+                request.session['reset_email'] = email
+                request.session['reset_student_id'] = str(student.student_id)
+                return redirect('verifyOTP')
+            except smtplib.SMTPAuthenticationError as e:
+                logger.error(f"Email authentication error while sending OTP to {email}: {str(e)}")
+                messages.error(request, 'Email service rejected the credentials. Please contact the administrator to update the email configuration.')
+                otp_obj.delete()
+                return render(request, 'main/forgotPassword.html')
+            except smtplib.SMTPException as e:
+                logger.error(f"SMTP error while sending OTP to {email}: {str(e)}")
+                messages.error(request, 'Unable to send OTP due to email service issues. Please try again later or contact support.')
+                otp_obj.delete()
+                return render(request, 'main/forgotPassword.html')
+            except Exception as e:
+                logger.error(f"Error sending email to {email}: {str(e)}")
+                messages.error(request, 'Failed to send OTP. Please check your email configuration or contact administrator.')
+                otp_obj.delete()
+                return render(request, 'main/forgotPassword.html')
+                
+        except Exception as e:
+            logger.error(f"Error in forgotPassword: {str(e)}")
+            messages.error(request, 'An error occurred. Please try again.')
+    
+    return render(request, 'main/forgotPassword.html')
+
+
+@csrf_protect
+@require_http_methods(["GET", "POST"])
+def verifyOTP(request):
+    """Verify OTP and allow password reset"""
+    email = request.session.get('reset_email')
+    student_id = request.session.get('reset_student_id')
+    
+    if not email:
+        messages.error(request, 'Session expired. Please start the password reset process again.')
+        return redirect('forgotPassword')
+    
+    if request.method == 'POST':
+        otp = request.POST.get('otp', '').strip()
+        
+        if not otp:
+            messages.error(request, 'Please enter the OTP.')
+            return render(request, 'main/verifyOTP.html', {'email': email})
+        
+        # Validate OTP format (6 digits)
+        if not otp.isdigit() or len(otp) != 6:
+            messages.error(request, 'OTP must be a 6-digit number.')
+            return render(request, 'main/verifyOTP.html', {'email': email})
+        
+        try:
+            # Find student by email (student_id is stored in session for verification)
+            if student_id:
+                student = Student.objects.get(student_id=student_id, email=email)
+            else:
+                # Fallback: find by email only if student_id not in session
+                students = Student.objects.filter(email=email)
+                if students.count() != 1:
+                    messages.error(request, 'Account verification failed. Please start the process again.')
+                    return redirect('forgotPassword')
+                student = students.first()
+            
+            otp_obj = PasswordResetOTP.objects.filter(
+                student=student,
+                email=email,
+                otp=otp,
+                is_used=False
+            ).order_by('-created_at').first()
+            
+            if otp_obj and not otp_obj.is_expired():
+                otp_obj.is_verified = True
+                otp_obj.save()
+                request.session['otp_verified'] = True
+                # Ensure student_id is in session for resetPassword
+                request.session['reset_student_id'] = str(student.student_id)
+                messages.success(request, 'OTP verified successfully. You can now reset your password.')
+                return redirect('resetPassword')
+            else:
+                if otp_obj and otp_obj.is_expired():
+                    messages.error(request, 'OTP has expired. Please request a new OTP.')
+                else:
+                    messages.error(request, 'Invalid OTP. Please try again.')
+        except Student.DoesNotExist:
+            messages.error(request, 'Student not found. Please start the process again.')
+            return redirect('forgotPassword')
+        except Exception as e:
+            logger.error(f"Error in verifyOTP: {str(e)}")
+            messages.error(request, 'An error occurred. Please try again.')
+    
+    return render(request, 'main/verifyOTP.html', {'email': email})
+
+
+@csrf_protect
+@require_http_methods(["GET", "POST"])
+def resetPassword(request):
+    """Reset password after OTP verification"""
+    email = request.session.get('reset_email')
+    student_id = request.session.get('reset_student_id')
+    otp_verified = request.session.get('otp_verified', False)
+    
+    if not email or not student_id or not otp_verified:
+        messages.error(request, 'Session expired or OTP not verified. Please start the process again.')
+        return redirect('forgotPassword')
+    
+    if request.method == 'POST':
+        new_password = request.POST.get('new_password', '').strip()
+        confirm_password = request.POST.get('confirm_password', '').strip()
+        
+        if not new_password or not confirm_password:
+            messages.error(request, 'Please fill in all fields.')
+            return render(request, 'main/resetPassword.html')
+        
+        if new_password != confirm_password:
+            messages.error(request, 'Passwords do not match.')
+            return render(request, 'main/resetPassword.html')
+        
+        if len(new_password) < 6:
+            messages.error(request, 'Password must be at least 6 characters long.')
+            return render(request, 'main/resetPassword.html')
+        
+        try:
+            student = Student.objects.get(student_id=student_id, email=email)
+            
+            # Verify OTP was used
+            otp_obj = PasswordResetOTP.objects.filter(
+                student=student,
+                email=email,
+                is_verified=True,
+                is_used=False
+            ).order_by('-created_at').first()
+            
+            if otp_obj and not otp_obj.is_expired():
+                # Update password
+                student.password = new_password
+                student.save()
+                
+                # Mark OTP as used
+                otp_obj.is_used = True
+                otp_obj.save()
+                
+                # Clear session
+                request.session.pop('reset_email', None)
+                request.session.pop('reset_student_id', None)
+                request.session.pop('otp_verified', None)
+                
+                messages.success(request, 'Password reset successfully! You can now login with your new password.')
+                return redirect('std_login')
+            else:
+                messages.error(request, 'OTP verification expired. Please start the process again.')
+                return redirect('forgotPassword')
+        except Student.DoesNotExist:
+            messages.error(request, 'Student not found.')
+            return redirect('forgotPassword')
+        except Exception as e:
+            logger.error(f"Error in resetPassword: {str(e)}")
+            messages.error(request, 'An error occurred. Please try again.')
+    
+    return render(request, 'main/resetPassword.html')
+
+
+# Email Management
+@csrf_protect
+@require_http_methods(["GET", "POST"])
+def saveEmail(request):
+    """Save email on first login (popup)"""
+    if request.session.get('student_id'):
+        try:
+            student = Student.objects.get(student_id=request.session['student_id'])
+            
+            if request.method == 'POST':
+                # Handle skip case
+                if request.POST.get('skip'):
+                    request.session.pop('show_email_popup', None)
+                    return JsonResponse({'success': True, 'message': 'You can add your email later from your profile.'})
+                
+                email = request.POST.get('email', '').strip()
+                
+                if not email:
+                    return JsonResponse({'success': False, 'message': 'Email is required.'})
+                
+                # Validate email format
+                from django.core.validators import validate_email
+                from django.core.exceptions import ValidationError
+                try:
+                    validate_email(email)
+                except ValidationError:
+                    return JsonResponse({'success': False, 'message': 'Please enter a valid email address.'})
+                
+                # Check if email is already used by another student
+                if Student.objects.filter(email=email).exclude(student_id=student.student_id).exists():
+                    return JsonResponse({'success': False, 'message': 'This email is already registered with another account.'})
+                
+                student.email = email
+                student.save()
+                
+                # Clear the popup flag
+                request.session.pop('show_email_popup', None)
+                request.session['email_saved'] = True
+                
+                return JsonResponse({'success': True, 'message': 'Email saved successfully!'})
+            else:
+                return JsonResponse({'success': False, 'message': 'Invalid request method.'})
+        except Student.DoesNotExist:
+            return JsonResponse({'success': False, 'message': 'Student not found.'})
+        except Exception as e:
+            logger.error(f"Error in saveEmail: {str(e)}")
+            return JsonResponse({'success': False, 'message': 'An error occurred. Please try again.'})
+    else:
+        return JsonResponse({'success': False, 'message': 'Please login first.'})
+
+
+@csrf_protect
+@require_http_methods(["GET", "POST"])
+def changeEmail(request):
+    """Change email for logged in student"""
+    if request.session.get('student_id'):
+        try:
+            student = Student.objects.get(student_id=request.session['student_id'])
+            
+            if request.method == 'POST':
+                new_email = request.POST.get('new_email', '').strip()
+                password = request.POST.get('password', '').strip()
+                
+                if not new_email or not password:
+                    messages.error(request, 'Please fill in all fields.')
+                    return render(request, 'main/changeEmail.html', {'student': student})
+                
+                # Verify password
+                if student.password != password:
+                    messages.error(request, 'Incorrect password. Please try again.')
+                    return render(request, 'main/changeEmail.html', {'student': student})
+                
+                # Validate email format
+                from django.core.validators import validate_email
+                from django.core.exceptions import ValidationError
+                try:
+                    validate_email(new_email)
+                except ValidationError:
+                    messages.error(request, 'Please enter a valid email address.')
+                    return render(request, 'main/changeEmail.html', {'student': student})
+                
+                # Check if email is already used
+                if Student.objects.filter(email=new_email).exclude(student_id=student.student_id).exists():
+                    messages.error(request, 'This email is already registered with another account.')
+                    return render(request, 'main/changeEmail.html', {'student': student})
+                
+                student.email = new_email
+                student.save()
+                
+                messages.success(request, 'Email updated successfully!')
+                return redirect('profile', id=str(student.student_id))
+            else:
+                return render(request, 'main/changeEmail.html', {'student': student})
+        except Student.DoesNotExist:
+            messages.error(request, 'Student not found.')
+            return redirect('std_login')
+        except Exception as e:
+            logger.error(f"Error in changeEmail: {str(e)}")
+            messages.error(request, 'An error occurred. Please try again.')
+            return redirect('profile', id=str(request.session.get('student_id')))
+    else:
         return redirect('std_login')

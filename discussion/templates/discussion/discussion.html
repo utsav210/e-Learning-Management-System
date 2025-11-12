@@ -45,6 +45,18 @@
    <!-- navigation links end -->
 
    <div class="container shadow p-3 rounded">
+      <!-- Error messages -->
+      {% if form.errors %}
+      {% for field, errors in form.errors.items %}
+      {% for error in errors %}
+      <div class="alert alert-danger alert-dismissible fade show" role="alert">
+         <span>{{ error }}</span>
+         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
+      {% endfor %}
+      {% endfor %}
+      {% endif %}
+      
       <div class="d-flex flex-column m-3">
          {% if faculty %}
          <form action="{% url 'send_fac' course.code faculty.faculty_id %}" method="POST">

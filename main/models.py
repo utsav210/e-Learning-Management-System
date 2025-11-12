@@ -196,7 +196,7 @@ class Material(models.Model):
         ordering = ['-datetime']
 
     def __str__(self):
-        return self.title
+        return self.description[:50] if self.description else "Material"
 
     def delete(self, *args, **kwargs):
         self.file.delete()
@@ -204,3 +204,26 @@ class Material(models.Model):
 
     def post_date(self):
         return self.datetime.strftime("%d-%b-%y, %I:%M %p")
+
+class PasswordResetOTP(models.Model):
+    """Model to store OTP for password reset"""
+    student = models.ForeignKey(Student, on_delete=models.CASCADE, null=True, blank=True)
+    email = models.EmailField(max_length=100, null=False)
+    otp = models.CharField(max_length=10, null=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    is_verified = models.BooleanField(default=False)
+    is_used = models.BooleanField(default=False)
+
+    class Meta:
+        verbose_name_plural = "Password Reset OTPs"
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"OTP for {self.email} - {self.otp}"
+
+    def is_expired(self):
+        from django.utils import timezone
+        from django.conf import settings
+        from datetime import timedelta
+        expiry_time = self.created_at + timedelta(minutes=getattr(settings, 'OTP_EXPIRY_MINUTES', 10))
+        return timezone.now() > expiry_time

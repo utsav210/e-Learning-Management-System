@@ -77,7 +77,17 @@ def send(request, code, std_id):
                     content=content, course=course, sent_by=student)
                 return redirect('discussion', code=code)
             else:
-                return redirect('discussion', code=code)
+                # Form has errors, render discussion page with error form
+                course = Course.objects.get(code=code)
+                student = Student.objects.get(student_id=request.session['student_id'])
+                discussions = context_list(course)
+                context = {
+                    'course': course,
+                    'student': student,
+                    'discussions': discussions,
+                    'form': form,  # Pass form with errors
+                }
+                return render(request, 'discussion/discussion.html', context)
         else:
             return redirect('discussion', code=code)
     else:
@@ -99,7 +109,17 @@ def send_fac(request, code, fac_id):
                     content=content, course=course, sent_by=faculty)
                 return redirect('discussion', code=code)
             else:
-                return redirect('discussion', code=code)
+                # Form has errors, render discussion page with error form
+                course = Course.objects.get(code=code)
+                faculty = Faculty.objects.get(faculty_id=request.session['faculty_id'])
+                discussions = context_list(course)
+                context = {
+                    'course': course,
+                    'faculty': faculty,
+                    'discussions': discussions,
+                    'form': form,  # Pass form with errors
+                }
+                return render(request, 'discussion/discussion.html', context)
         else:
             return redirect('discussion', code=code)
     else:

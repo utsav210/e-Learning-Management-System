@@ -1,4 +1,5 @@
 import datetime
+import logging
 from django.shortcuts import render, redirect, get_object_or_404
 from .models import Quiz, Question, StudentAnswer
 from main.models import Student, Course, Faculty
@@ -7,6 +8,11 @@ from django.contrib import messages
 from django.utils import timezone
 from django.db.models import Count, Sum, F, FloatField, Q, Prefetch
 from django.db.models.functions import Cast
+from django.core.exceptions import ObjectDoesNotExist, ValidationError
+from django.http import Http404
+
+# Configure logging
+logger = logging.getLogger(__name__)
 
 
 def quiz(request, code):
@@ -14,21 +20,44 @@ def quiz(request, code):
         course = Course.objects.get(code=code)
         if is_faculty_authorised(request, code):
             if request.method == 'POST':
-                title = request.POST.get('title')
-                description = request.POST.get('description')
+                title = request.POST.get('title', '').strip()
+                description = request.POST.get('description', '').strip()
                 start = request.POST.get('start')
                 end = request.POST.get('end')
                 publish_status = request.POST.get('checkbox')
+                
+                # Input validation
+                if not title or len(title) > 255:
+                    messages.error(request, 'Title is required and must be less than 255 characters')
+                    return render(request, 'quiz/quiz.html', {'course': course, 'faculty': Faculty.objects.get(faculty_id=request.session['faculty_id'])})
+                
+                if not start or not end:
+                    messages.error(request, 'Start and end times are required')
+                    return render(request, 'quiz/quiz.html', {'course': course, 'faculty': Faculty.objects.get(faculty_id=request.session['faculty_id'])})
+                
+                try:
+                    start_dt = datetime.datetime.fromisoformat(start.replace('T', ' '))
+                    end_dt = datetime.datetime.fromisoformat(end.replace('T', ' '))
+                    if start_dt >= end_dt:
+                        messages.error(request, 'End time must be after start time')
+                        return render(request, 'quiz/quiz.html', {'course': course, 'faculty': Faculty.objects.get(faculty_id=request.session['faculty_id'])})
+                except ValueError:
+                    messages.error(request, 'Invalid date format')
+                    return render(request, 'quiz/quiz.html', {'course': course, 'faculty': Faculty.objects.get(faculty_id=request.session['faculty_id'])})
+                
                 quiz = Quiz(title=title, description=description, start=start,
                             end=end, publish_status=publish_status, course=course)
                 quiz.save()
                 return redirect('addQuestion', code=code, quiz_id=quiz.id)
             else:
                 return render(request, 'quiz/quiz.html', {'course': course, 'faculty': Faculty.objects.get(faculty_id=request.session['faculty_id'])})
-
         else:
             return redirect('std_login')
-    except:
+    except ObjectDoesNotExist:
+        logger.error(f"Course not found: {code}")
+        raise Http404("Course not found")
+    except Exception as e:
+        logger.error(f"Error in quiz: {str(e)}")
         return render(request, 'error.html')
 
 
@@ -251,8 +280,5 @@ def quizSummary(request, code, quiz_id):
         context = {'course': course, 'quiz': quiz, 'questions': questions, 'time': time, 'total_students': total_students,
                    'students': students, 'faculty': Faculty.objects.get(faculty_id=request.session['faculty_id'])}
         return render(request, 'quiz/quizSummaryFaculty.html', context)
-
     else:
         return redirect('std_login')
-
-

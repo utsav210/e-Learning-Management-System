@@ -6,75 +6,911 @@
       <meta http-equiv="X-UA-Compatible" content="IE=edge">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <title>Log in | eLMS</title>
+      
+      <!-- Security Headers -->
+      <meta http-equiv="X-Content-Type-Options" content="nosniff">
+      <meta http-equiv="X-Frame-Options" content="DENY">
+      <meta http-equiv="X-XSS-Protection" content="1; mode=block">
+      
+      <!-- Favicon and Icons -->
       <link rel="apple-touch-icon" sizes="180x180" href="{% static 'images/icon/apple-touch-icon.png' %}">
       <link rel="icon" type="image/png" sizes="32x32" href="{% static 'images/icon/favicon-32x32.png' %}">
       <link rel="icon" type="image/png" sizes="16x16" href="{% static 'images/icon/favicon-16x16.png' %}">
       <link rel="manifest" href="{% static 'images/icon/site.webmanifest' %}">
+      
+      <!-- Stylesheets -->
       <link rel="stylesheet" href="{% static 'styles/bootstrap.min.css' %}">
       <link rel="stylesheet" href="{% static 'styles/style.css' %}">
+      <link rel="stylesheet" href="{% static 'styles/theme-edu.css' %}">
       <link rel="stylesheet" href="{% static 'styles/style-login.css' %}">
       <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@48,400,0,0" />
+      <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+      
+      <!-- Enhanced LMS Theme Styles -->
+      <style>
+         :root {
+            --primary-color: #2563eb;
+            --primary-dark: #1d4ed8;
+            --secondary-color: #7c3aed;
+            --accent-color: #06b6d4;
+            --success-color: #10b981;
+            --warning-color: #f59e0b;
+            --danger-color: #ef4444;
+            --light-bg: #f8fafc;
+            --dark-text: #1e293b;
+            --muted-text: #64748b;
+            --border-color: #e2e8f0;
+            --border-radius: 12px;
+            --box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+         }
+
+         * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+         }
+
+         body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            position: relative;
+            overflow-x: hidden;
+         }
+
+         /* Animated Background */
+         body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: 
+               radial-gradient(circle at 20% 80%, rgba(120, 119, 198, 0.3) 0%, transparent 50%),
+               radial-gradient(circle at 80% 20%, rgba(255, 119, 198, 0.3) 0%, transparent 50%),
+               radial-gradient(circle at 40% 40%, rgba(120, 219, 255, 0.3) 0%, transparent 50%);
+            animation: backgroundShift 20s ease-in-out infinite;
+            z-index: -1;
+         }
+
+         @keyframes backgroundShift {
+            0%, 100% { transform: translateX(0) translateY(0); }
+            25% { transform: translateX(-20px) translateY(-10px); }
+            50% { transform: translateX(20px) translateY(10px); }
+            75% { transform: translateX(-10px) translateY(20px); }
+         }
+
+         .main {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            position: relative;
+         }
+
+         .signin-content {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border-radius: 24px;
+            box-shadow: 
+               0 25px 50px rgba(0,0,0,0.15),
+               0 0 0 1px rgba(255,255,255,0.2);
+            overflow: hidden;
+            max-width: 1200px;
+            width: 100%;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-gap: 0;
+            min-height: 650px;
+            position: relative;
+         }
+
+         .signin-image {
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+         }
+
+         .signin-image::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="dots" width="20" height="20" patternUnits="userSpaceOnUse"><circle cx="10" cy="10" r="1.5" fill="rgba(255,255,255,0.1)"/></pattern></defs><rect width="100" height="100" fill="url(%23dots)"/></svg>');
+            opacity: 0.6;
+         }
+
+         .signin-image figure {
+            position: relative;
+            z-index: 2;
+            text-align: center;
+            padding: 50px 40px;
+         }
+
+         .signin-image img {
+            max-width: 320px;
+            width: 100%;
+            height: auto;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+            transition: var(--transition);
+         }
+
+         .signin-image img:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 25px 50px rgba(0,0,0,0.4);
+         }
+
+         /* LMS Branding */
+         .lms-branding {
+            position: absolute;
+            top: 30px;
+            left: 30px;
+            color: white;
+            z-index: 3;
+         }
+
+         .lms-branding h3 {
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin-bottom: 5px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+         }
+
+         .lms-branding p {
+            font-size: 0.9rem;
+            opacity: 0.9;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+         }
+
+         .signin-form {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            background: rgba(255, 255, 255, 0.98);
+         }
+
+         .form-title {
+            font-size: 2.8rem;
+            font-weight: 700;
+            color: var(--dark-text);
+            margin-bottom: 8px;
+            text-align: center;
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+         }
+
+         .form-subtitle {
+            text-align: center;
+            color: var(--muted-text);
+            margin-bottom: 40px;
+            font-size: 1.2rem;
+            font-weight: 400;
+         }
+
+         .form-group {
+            position: relative;
+            margin-bottom: 25px;
+         }
+
+         .form-group label {
+            position: absolute;
+            left: 22px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--muted-text);
+            font-size: 1.3rem;
+            z-index: 2;
+            transition: var(--transition);
+            pointer-events: none;
+         }
+
+         .form-control {
+            width: 100%;
+            padding: 20px 20px 20px 60px;
+            border: 2px solid var(--border-color);
+            border-radius: var(--border-radius);
+            font-size: 1.1rem;
+            background: #ffffff;
+            transition: var(--transition);
+            box-shadow: none;
+            color: var(--dark-text);
+            font-weight: 400;
+         }
+
+         .form-control::placeholder {
+            color: var(--muted-text);
+            opacity: 1;
+         }
+
+         .form-control:focus {
+            border-color: var(--primary-color);
+            background: #ffffff;
+            box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
+            outline: none;
+         }
+
+         .form-control:focus ~ label {
+            color: var(--primary-color);
+         }
+
+         .form-control:hover {
+            border-color: #cbd5e0;
+         }
+
+         .btn-login {
+            background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+            border: none;
+            border-radius: var(--border-radius);
+            padding: 10px 20px;
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: white;
+            transition: var(--transition);
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(37, 99, 235, 0.3);
+         }
+
+         .btn-login:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(37, 99, 235, 0.4);
+         }
+
+         .btn-login:active {
+            transform: translateY(0);
+         }
+
+         .btn-login:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+            transform: none;
+         }
+
+         .guest-links {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 30px;
+            padding-top: 30px;
+            border-top: 1px solid var(--border-color);
+         }
+
+         .guest-links a {
+            color: var(--muted-text);
+            text-decoration: none;
+            font-weight: 500;
+            transition: var(--transition);
+            padding: 10px 16px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+         }
+
+         .guest-links a:hover {
+            color: var(--primary-color);
+            background: rgba(37, 99, 235, 0.1);
+         }
+
+         .dropdown-menu {
+            border: none;
+            box-shadow: var(--box-shadow);
+            border-radius: var(--border-radius);
+            padding: 10px;
+            margin-top: 5px;
+         }
+
+         .dropdown-item {
+            border-radius: 8px;
+            padding: 12px 16px;
+            transition: var(--transition);
+            font-size: 0.9rem;
+         }
+
+         .dropdown-item:hover {
+            background: rgba(37, 99, 235, 0.1);
+            color: var(--primary-color);
+         }
+
+         .alert {
+            border: none;
+            border-radius: var(--border-radius);
+            padding: 16px 20px;
+            margin-bottom: 20px;
+            font-weight: 500;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+         }
+
+         .alert-danger {
+            background: linear-gradient(135deg, #fee2e2, #fecaca);
+            color: #dc2626;
+            border-left: 4px solid var(--danger-color);
+         }
+
+         .alert-info {
+            background: linear-gradient(135deg, #dbeafe, #bfdbfe);
+            color: var(--primary-color);
+            border-left: 4px solid var(--primary-color);
+         }
+
+         /* Educational Icons */
+         .edu-icon {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 60px;
+            height: 60px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            color: white;
+            backdrop-filter: blur(10px);
+         }
+
+         /* Responsive Design */
+         @media (max-width: 768px) {
+            .signin-content {
+               grid-template-columns: 1fr;
+               max-width: 450px;
+               min-height: 500px;
+            }
+            
+            .signin-image {
+               display: none;
+            }
+            
+            .signin-form {
+               padding: 50px 40px;
+            }
+            
+            .form-title {
+               font-size: 2.2rem;
+            }
+            
+            .guest-links {
+               flex-direction: column;
+               gap: 15px;
+            }
+         }
+
+         @media (max-width: 480px) {
+            .main {
+               padding: 10px;
+            }
+            
+            .signin-form {
+               padding: 40px 30px;
+            }
+            
+            .form-title {
+               font-size: 2rem;
+            }
+         }
+
+         /* Loading Animation */
+         .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.9);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            opacity: 0;
+            visibility: hidden;
+            transition: var(--transition);
+         }
+
+         .loading-overlay.show {
+            opacity: 1;
+            visibility: visible;
+         }
+
+         .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #e2e8f0;
+            border-top: 4px solid var(--primary-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+         }
+
+         @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+         }
+
+         /* Form Animation */
+         .form-group {
+            animation: slideInUp 0.6s ease-out;
+         }
+
+         .form-group:nth-child(1) { animation-delay: 0.1s; }
+         .form-group:nth-child(2) { animation-delay: 0.2s; }
+         .form-group:nth-child(3) { animation-delay: 0.3s; }
+
+         @keyframes slideInUp {
+            from {
+               opacity: 0;
+               transform: translateY(30px);
+            }
+            to {
+               opacity: 1;
+               transform: translateY(0);
+            }
+         }
+      </style>
    </head>
    <body>
+      <!-- Loading Overlay -->
+      <div class="loading-overlay" id="loadingOverlay">
+         <div class="loading-spinner"></div>
+      </div>
+
       <div class="main">
-         <section class="sign-in">
-            <div class="container">
-               <div class="signin-content">
-                  <div class="signin-image">
-                     <figure><img src="{% static 'images/login-bg.jpg' %}" alt="sing up image"></figure>
+         <div class="signin-content">
+            <!-- Left Side - Image with LMS Branding -->
+            <div class="signin-image">
+               <div class="lms-branding">
+                  <h3>📚 eLMS</h3>
+                  <p>Learning Management System</p>
+               </div>
+               <div class="edu-icon">
+                  <span class="material-symbols-outlined">school</span>
+               </div>
+               <figure>
+                  <img src="{% static 'images/login-bg.jpg' %}" alt="eLMS Learning Platform">
+               </figure>
+            </div>
+            
+            <!-- Right Side - Enhanced Form -->
+            <div class="signin-form">
+               <h2 class="form-title">Welcome Back</h2>
+               <p class="form-subtitle">Sign in to continue your learning journey</p>
+               
+               {% if error_messages %}
+               <!-- Error Alert -->
+               <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                  <strong>⚠️ Login Failed!</strong>
+                  {% for message in error_messages %}
+                  <div>{{ message }}</div>
+                  {% endfor %}
+                  <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+               </div>
+               {% endif %}
+               
+               <form method="POST" class="register-form" id="login-form" novalidate>
+                  {% csrf_token %}
+                  
+                  <div class="form-group">
+                     <label for="{{ form.username.id_for_label }}">
+                        <span class="material-symbols-outlined">person</span>
+                     </label>
+                     {{ form.username }}
                   </div>
-                  <div class="signin-form">
-                     <h2 class="form-title">Sign in to eLMS</h2>
-                     <form method="POST" class="register-form" id="login-form">
-                           {% csrf_token %}
-                           <div class="form-group">
-                              <label for="{{ form.id.id_for_label }}"><span class="material-symbols-outlined" style="vertical-align:text-bottom">person</span></label>
-                              {{ form.id }}
-                           </div>
-                           <div class="form-group">
-                              <label for="{{ form.password.id_for_label }}"><span class="material-symbols-outlined" style="vertical-align:text-bottom">lock</span></label>
-                              {{ form.password }}
-                           </div>
-                           <div class="d-grid">
-                              <button class="btn btn-lg btn-primary btn-login text-uppercase fw-bold mb-2" type="submit">Sign in</button>
-                           </div>
-                     </form>
-                     <div class="d-flex justify-content-around flex-wrap">
-                        <div class="">
-                           <div class="dropdown">
-                              <a class="dropdown-toggle" id="dropdownMenuButton1"
-                                 data-bs-toggle="dropdown" aria-expanded="false" role="button">
-                              Sign in as Guest
-                              </a>
-                              <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton1">
-                                 <li><a class="dropdown-item" href="/student">Student</a></li>
-                                 <li><a class="dropdown-item" href="/teacher">Teacher</a></li>
-                              </ul>
-                           </div>
-                        </div>
-                        <div class="">
-                           <a href="/admin" target="_blank">Sign in as Admin</a>
-                        </div>
-                     </div>
-                     {% if error_messages %}
-                     <!-- Error Alert -->
-                     <div class="alert alert-danger alert-dismissible fade show my-2">
-                        {% for message in error_messages %}
-                        {{ message }}
-                        {% endfor %}
-                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                     </div>
-                     {% endif %}
+                  
+                  <div class="form-group">
+                     <label for="{{ form.password.id_for_label }}">
+                        <span class="material-symbols-outlined">lock</span>
+                     </label>
+                     {{ form.password }}
                   </div>
+                  
+                  <div class="form-group">
+                     <button class="btn btn-lg btn-primary btn-login" type="submit" id="login-btn">
+                        <span class="btn-text">Sign In</span>
+                        <span class="btn-loading" style="display: none;">
+                           <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                           Signing in...
+                        </span>
+                     </button>
+                  </div>
+                  
+                  <div class="text-center mt-3">
+                     <a href="{% url 'forgotPassword' %}" class="text-decoration-none" style="color: var(--primary-color);">
+                        <span class="material-symbols-outlined" style="font-size: 16px; vertical-align: middle;">lock_reset</span>
+                        Forgot Password?
+                     </a>
+                  </div>
+               </form>
+               
+               <div class="guest-links">
+                  <div class="dropdown">
+                     <a class="dropdown-toggle" id="dropdownMenuButton1" data-bs-toggle="dropdown" aria-expanded="false" role="button">
+                        <span class="material-symbols-outlined me-1" id="guest-icon" style="font-size: 18px;">person_add</span>
+                        <span id="guest-text">Guest Access</span>
+                        <!-- <span class="material-symbols-outlined ms-1" style="font-size: 16px;">keyboard_arrow_down</span> -->
+                     </a>
+                     <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton1">
+                        <li><a class="dropdown-item guest-option" href="/student" data-type="student" data-icon="school" data-text="Student">
+                           <span class="material-symbols-outlined me-2" style="font-size: 18px;">school</span>
+                           Student
+                        </a></li>
+                        <li><a class="dropdown-item guest-option" href="/teacher" data-type="teacher" data-icon="person" data-text="Teacher">
+                           <span class="material-symbols-outlined me-2" style="font-size: 18px;">person</span>
+                           Teacher
+                        </a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item guest-option" href="#" data-type="guest" data-icon="person_add" data-text="Guest Access">
+                           <span class="material-symbols-outlined me-2" style="font-size: 18px;">person_add</span>
+                           Reset to Guest
+                        </a></li>
+                     </ul>
+                  </div>
+                  
+                  <a href="/admin" target="_blank" class="btn btn-lg">
+                     <span class="material-symbols-outlined me-1" style="font-size: 18px;">admin_panel_settings</span>
+                     Admin Panel
+                  </a>
                </div>
             </div>
-         </section>
+         </div>
       </div>
-      <script src=" {% static 'js/bootstrap.bundle.min.js' %} "></script>
+      <script src="{% static 'js/bootstrap.bundle.min.js' %}"></script>
       <script>
-         if (window.history.replaceState) {
-             window.history.replaceState(null, null, window.location.href);
-         }     
+         // Enhanced LMS Login Functionality
+         document.addEventListener('DOMContentLoaded', function() {
+             const form = document.getElementById('login-form');
+             const usernameField = document.querySelector('input[name="username"]');
+             const passwordField = document.querySelector('input[name="password"]');
+             const loginBtn = document.getElementById('login-btn');
+             const loadingOverlay = document.getElementById('loadingOverlay');
+             const btnText = loginBtn.querySelector('.btn-text');
+             const btnLoading = loginBtn.querySelector('.btn-loading');
+             
+             // Add enhanced placeholders
+             if (usernameField && !usernameField.placeholder) {
+                 usernameField.placeholder = 'Enter your username';
+             }
+             if (passwordField && !passwordField.placeholder) {
+                 passwordField.placeholder = 'Enter your password';
+             }
+             
+             // Real-time validation feedback
+             function validateField(field, minLength = 1) {
+                 const value = field.value.trim();
+                 const isValid = value.length >= minLength;
+                 
+                 if (isValid) {
+                     field.style.borderColor = 'var(--success-color)';
+                     field.style.boxShadow = '0 0 0 4px rgba(16, 185, 129, 0.1)';
+                 } else {
+                     field.style.borderColor = 'var(--border-color)';
+                     field.style.boxShadow = 'none';
+                 }
+                 
+                 return isValid;
+             }
+             
+             // Add real-time validation
+             usernameField.addEventListener('input', function() {
+                 validateField(this);
+             });
+             
+             passwordField.addEventListener('input', function() {
+                 validateField(this);
+             });
+             
+             // Enhanced form submission with loading state
+             form.addEventListener('submit', function(e) {
+                 let isValid = true;
+                 
+                 // Validate username field
+                 if (!validateField(usernameField)) {
+                     showError('Please enter a valid username');
+                     usernameField.focus();
+                     isValid = false;
+                 }
+                 
+                 // Validate password field
+                 if (!validateField(passwordField)) {
+                     showError('Please enter your password');
+                     passwordField.focus();
+                     isValid = false;
+                 }
+                 
+                 if (isValid) {
+                     // Show loading state
+                     loginBtn.disabled = true;
+                     btnText.style.display = 'none';
+                     btnLoading.style.display = 'inline-block';
+                     
+                     // Show loading overlay
+                     loadingOverlay.classList.add('show');
+                     
+                     // Simulate loading time for better UX
+                     setTimeout(() => {
+                         // Form will submit naturally after this
+                     }, 500);
+                 } else {
+                     e.preventDefault();
+                 }
+             });
+             
+             // Error display function
+             function showError(message) {
+                 // Remove existing alerts
+                 const existingAlert = document.querySelector('.alert-danger');
+                 if (existingAlert) {
+                     existingAlert.remove();
+                 }
+                 
+                 // Create new alert
+                 const alert = document.createElement('div');
+                 alert.className = 'alert alert-danger alert-dismissible fade show';
+                 alert.innerHTML = `
+                     <strong>⚠️ ${message}</strong>
+                     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                 `;
+                 
+                 // Insert before form
+                 form.parentNode.insertBefore(alert, form);
+                 
+                 // Auto-dismiss after 5 seconds
+                 setTimeout(() => {
+                     if (alert.parentNode) {
+                         alert.remove();
+                     }
+                 }, 5000);
+             }
+             
+             // Enhanced focus management
+             function focusNextField(currentField) {
+                 const fields = [usernameField, passwordField];
+                 const currentIndex = fields.indexOf(currentField);
+                 
+                 if (currentIndex < fields.length - 1) {
+                     fields[currentIndex + 1].focus();
+                 }
+             }
+             
+             // Enter key navigation
+             usernameField.addEventListener('keypress', function(e) {
+                 if (e.key === 'Enter') {
+                     e.preventDefault();
+                     focusNextField(this);
+                 }
+             });
+             
+             passwordField.addEventListener('keypress', function(e) {
+                 if (e.key === 'Enter') {
+                     // Let form submit naturally
+                 }
+             });
+             
+             // Clear password on page unload for security
+             window.addEventListener('beforeunload', function() {
+                 if (passwordField) {
+                     passwordField.value = '';
+                 }
+             });
+             
+             // Prevent form resubmission on page refresh
+             if (window.history.replaceState) {
+                 window.history.replaceState(null, null, window.location.href);
+             }
+             
+             // Auto-focus on username field
+             if (usernameField) {
+                 setTimeout(() => {
+                     usernameField.focus();
+                 }, 300);
+             }
+             
+             // Add ripple effect to button
+             loginBtn.addEventListener('click', function(e) {
+                 const ripple = document.createElement('span');
+                 const rect = this.getBoundingClientRect();
+                 const size = Math.max(rect.width, rect.height);
+                 const x = e.clientX - rect.left - size / 2;
+                 const y = e.clientY - rect.top - size / 2;
+                 
+                 ripple.style.width = ripple.style.height = size + 'px';
+                 ripple.style.left = x + 'px';
+                 ripple.style.top = y + 'px';
+                 ripple.classList.add('ripple');
+                 
+                 this.appendChild(ripple);
+                 
+                 setTimeout(() => {
+                     ripple.remove();
+                 }, 600);
+             });
+             
+             // Dynamic Guest Access Dropdown
+             const guestOptions = document.querySelectorAll('.guest-option');
+             const guestIcon = document.getElementById('guest-icon');
+             const guestText = document.getElementById('guest-text');
+             
+             // Load saved selection on page load
+             function loadSavedSelection() {
+                 const savedType = localStorage.getItem('selectedGuestType');
+                 const dropdownButton = document.getElementById('dropdownMenuButton1');
+                 
+                 if (savedType && savedType !== 'guest') {
+                     const savedOption = document.querySelector(`[data-type="${savedType}"]`);
+                     if (savedOption) {
+                         const icon = savedOption.getAttribute('data-icon');
+                         const text = savedOption.getAttribute('data-text');
+                         
+                         guestIcon.textContent = icon;
+                         guestText.textContent = text;
+                         
+                         // Add active state
+                         guestOptions.forEach(opt => opt.classList.remove('active'));
+                         savedOption.classList.add('active');
+                         
+                         // Add visual indicator
+                         dropdownButton.setAttribute('data-selected', 'true');
+                     }
+                 } else {
+                     // Reset visual state
+                     dropdownButton.setAttribute('data-selected', 'false');
+                 }
+             }
+             
+             // Save selection to localStorage
+             function saveSelection(type, icon, text) {
+                 localStorage.setItem('selectedGuestType', type);
+                 localStorage.setItem('selectedGuestIcon', icon);
+                 localStorage.setItem('selectedGuestText', text);
+             }
+             
+             // Initialize saved selection
+             loadSavedSelection();
+             
+             guestOptions.forEach(option => {
+                 option.addEventListener('click', function(e) {
+                     e.preventDefault(); // Prevent default navigation
+                     
+                     const type = this.getAttribute('data-type');
+                     const icon = this.getAttribute('data-icon');
+                     const text = this.getAttribute('data-text');
+                     
+                     const dropdownButton = document.getElementById('dropdownMenuButton1');
+                     
+                     if (type === 'guest') {
+                         // Reset to guest access
+                         guestIcon.textContent = 'person_add';
+                         guestText.textContent = 'Guest Access';
+                         
+                         // Remove any active states
+                         guestOptions.forEach(opt => opt.classList.remove('active'));
+                         
+                         // Clear saved selection
+                         localStorage.removeItem('selectedGuestType');
+                         localStorage.removeItem('selectedGuestIcon');
+                         localStorage.removeItem('selectedGuestText');
+                         
+                         // Reset visual state
+                         dropdownButton.setAttribute('data-selected', 'false');
+                         
+                         // Show success message
+                         showSuccess('Reset to Guest Access');
+                         return;
+                     }
+                     
+                     // Update the dropdown button
+                     guestIcon.textContent = icon;
+                     guestText.textContent = text;
+                     
+                     // Add active state to selected option
+                     guestOptions.forEach(opt => opt.classList.remove('active'));
+                     this.classList.add('active');
+                     
+                     // Save selection
+                     saveSelection(type, icon, text);
+                     
+                     // Add visual indicator
+                     dropdownButton.setAttribute('data-selected', 'true');
+                     
+                     // Show success message
+                     showSuccess(`${text} mode selected`);
+                     
+                     // Close the dropdown
+                     const dropdown = bootstrap.Dropdown.getInstance(dropdownButton);
+                     if (dropdown) {
+                         dropdown.hide();
+                     }
+                 });
+             });
+             
+             // Success message function
+             function showSuccess(message) {
+                 // Remove existing alerts
+                 const existingAlert = document.querySelector('.alert-success');
+                 if (existingAlert) {
+                     existingAlert.remove();
+                 }
+                 
+                 // Create success alert
+                 const alert = document.createElement('div');
+                 alert.className = 'alert alert-success alert-dismissible fade show';
+                 alert.innerHTML = `
+                     <strong>✅ ${message}</strong>
+                     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                 `;
+                 
+                 // Insert before form
+                 const form = document.getElementById('login-form');
+                 form.parentNode.insertBefore(alert, form);
+                 
+                 // Auto-dismiss after 3 seconds
+                 setTimeout(() => {
+                     if (alert.parentNode) {
+                         alert.remove();
+                     }
+                 }, 3000);
+             }
+             
+             // Add CSS for ripple effect and active states
+             const style = document.createElement('style');
+             style.textContent = `
+                 .btn-login {
+                     position: relative;
+                     overflow: hidden;
+                 }
+                 
+                 .ripple {
+                     position: absolute;
+                     border-radius: 50%;
+                     background: rgba(255, 255, 255, 0.3);
+                     transform: scale(0);
+                     animation: ripple-animation 0.6s linear;
+                     pointer-events: none;
+                 }
+                 
+                 @keyframes ripple-animation {
+                     to {
+                         transform: scale(4);
+                         opacity: 0;
+                     }
+                 }
+                 
+                 .guest-option.active {
+                     background: rgba(37, 99, 235, 0.1);
+                     color: var(--primary-color);
+                     font-weight: 600;
+                 }
+                 
+                 .alert-success {
+                     background: linear-gradient(135deg, #d1fae5, #a7f3d0);
+                     color: #065f46;
+                     border-left: 4px solid var(--success-color);
+                 }
+                 
+                 .dropdown-divider {
+                     margin: 8px 0;
+                     border-color: var(--border-color);
+                 }
+                 
+                 .dropdown-toggle[data-selected="true"] {
+                     background: rgba(37, 99, 235, 0.1);
+                     color: var(--primary-color);
+                     border: 2px solid var(--primary-color);
+                 }
+                 
+                 .dropdown-toggle[data-selected="true"]:hover {
+                     background: rgba(37, 99, 235, 0.15);
+                 }
+             `;
+             document.head.appendChild(style);
+         });
       </script>
    </body>
 </html>
