@@ -1,0 +1,82 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+   <head>
+      <meta charset="UTF-8">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Verify Login OTP | eLMS</title>
+      <link rel="apple-touch-icon" sizes="180x180" href="{% static 'images/icon/apple-touch-icon.png' %}">
+      <link rel="icon" type="image/png" sizes="32x32" href="{% static 'images/icon/favicon-32x32.png' %}">
+      <link rel="icon" type="image/png" sizes="16x16" href="{% static 'images/icon/favicon-16x16.png' %}">
+      <link rel="manifest" href="{% static 'images/icon/site.webmanifest' %}">
+      <link rel="stylesheet" href="{% static 'styles/bootstrap.min.css' %}">
+      <link rel="stylesheet" href="{% static 'styles/style.css' %}">
+      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@48,400,0,0" />
+   </head>
+   <body>
+      <div class="container">
+         <div style="min-height:85vh" class="row justify-content-center align-items-center">
+            <div class="col-lg-5 col-sm-12 p-5 rounded shadow">
+               <div class="text-center mb-4">
+                  <h4 class="fw-bold mb-2">
+                     <span class="material-symbols-outlined" style="font-size: 2.5rem; color: #2563eb;">verified_user</span>
+                  </h4>
+                  <h5 class="mb-3 fw-bold">Two-Factor Authentication</h5>
+                  <p class="text-muted">Enter the 6-digit OTP sent to <strong>{{ email }}</strong> to complete your login</p>
+               </div>
+               
+               {% if messages %}
+               {% for message in messages %}
+               <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                  {{ message }}
+                  <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+               </div>
+               {% endfor %}
+               {% endif %}
+               
+               <form action="{% url 'verifyLoginOTP' %}" method="post">
+                  {% csrf_token %}
+                  <div class="mb-3">
+                     <label for="otp" class="form-label">Verification Code (OTP) <span class="text-danger">*</span></label>
+                     <input type="text" class="form-control text-center" id="otp" name="otp" required placeholder="000000" maxlength="6" pattern="[0-9]{6}" style="font-size: 1.5rem; letter-spacing: 0.5rem;" autofocus>
+                     <div class="form-text">Check your email for the 6-digit verification code</div>
+                  </div>
+                  <div class="d-grid">
+                     <button type="submit" class="btn btn-primary">
+                        <span class="material-symbols-outlined me-2" style="font-size: 18px; vertical-align: middle;">verified</span>
+                        Verify & Login
+                     </button>
+                  </div>
+                  <div class="text-center mt-3">
+                     <a href="{% url 'std_login' %}" class="text-decoration-none">
+                        <span class="material-symbols-outlined" style="font-size: 16px; vertical-align: middle;">arrow_back</span>
+                        Back to Login
+                     </a>
+                  </div>
+               </form>
+            </div>
+         </div>
+      </div>
+      <script src="{% static 'js/bootstrap.bundle.min.js' %}"></script>
+      <script>
+         // Auto-focus and format OTP input
+         document.getElementById('otp').addEventListener('input', function(e) {
+            this.value = this.value.replace(/[^0-9]/g, '');
+         });
+         
+         // Auto-submit when 6 digits are entered (optional UX enhancement)
+         document.getElementById('otp').addEventListener('input', function(e) {
+            if (this.value.length === 6) {
+               // Optionally auto-submit, but let user click button for better UX
+               // this.form.submit();
+            }
+         });
+      </script>
+   </body>
+</html>
+
+
+
+
+

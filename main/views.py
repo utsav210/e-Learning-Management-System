@@ -2,7 +2,7 @@ import datetime
 import logging
 from django.shortcuts import redirect, render
 from django.contrib import messages
-from .models import Student, Course, Announcement, Assignment, Submission, Material, Faculty, Department, PasswordResetOTP
+from .models import Student, Course, Announcement, Assignment, Submission, Material, Faculty, Department, PasswordResetOTP, LoginOTP
 from django.template.defaulttags import register
 from django.db.models import Count, Q
 from django.http import HttpResponseRedirect, Http404, JsonResponse
@@ -82,7 +82,7 @@ def is_faculty_authorised(request, code):
         return False
 
 
-# Custom Login page for both student and faculty
+# Custom Login page for both student and faculty with 2FA
 @never_cache
 @csrf_protect
 @require_http_methods(["GET", "POST"])
@@ -101,11 +101,58 @@ def std_login(request):
                 student = Student.objects.get(name=username)
                 # Direct comparison for plaintext passwords
                 if student.password == password:
-                    request.session['student_id'] = student.student_id
-                    # Check if email is set, if not, mark for popup
+                    # Check if email is set (required for 2FA)
                     if not student.email:
-                        request.session['show_email_popup'] = True
-                    return redirect('myCourses')
+                        error_messages.append('Email address is required for login. Please contact administrator to add your email.')
+                        context = {'form': form, 'error_messages': error_messages}
+                        return render(request, 'login_page.html', context)
+                    
+                    # Generate OTP for 2FA
+                    otp = generate_otp()
+                    
+                    # Invalidate previous login OTPs for this student
+                    LoginOTP.objects.filter(student=student, is_used=False).update(is_used=True)
+                    
+                    # Create new login OTP
+                    login_otp = LoginOTP.objects.create(
+                        student=student,
+                        email=student.email,
+                        otp=otp,
+                        user_type='student'
+                    )
+                    
+                    # Send OTP email
+                    try:
+                        send_mail(
+                            subject='Login Verification OTP - eLMS',
+                            message=f'''Hello {student.name},
+
+You are attempting to login to your eLMS account.
+
+Your login verification OTP (One-Time Password) is: {otp}
+
+This OTP is valid for {getattr(settings, 'OTP_EXPIRY_MINUTES', 10)} minutes.
+
+If you did not attempt to login, please ignore this email and contact administrator immediately.
+
+Best regards,
+eLMS Team''',
+                            from_email=settings.DEFAULT_FROM_EMAIL,
+                            recipient_list=[student.email],
+                            fail_silently=False,
+                        )
+                        # Store pending login info in session
+                        request.session['pending_login_user_type'] = 'student'
+                        request.session['pending_login_id'] = str(student.student_id)
+                        request.session['pending_login_email'] = student.email
+                        messages.success(request, f'OTP has been sent to your email: {student.email}')
+                        return redirect('verifyLoginOTP')
+                    except Exception as e:
+                        logger.error(f"Error sending login OTP email: {str(e)}")
+                        login_otp.delete()
+                        error_messages.append('Failed to send OTP. Please check your email configuration or contact administrator.')
+                        context = {'form': form, 'error_messages': error_messages}
+                        return render(request, 'login_page.html', context)
             except Student.DoesNotExist:
                 pass
             
@@ -114,8 +161,58 @@ def std_login(request):
                 faculty = Faculty.objects.get(name=username)
                 # Direct comparison for plaintext passwords
                 if faculty.password == password:
-                    request.session['faculty_id'] = faculty.faculty_id
-                    return redirect('facultyCourses')
+                    # Check if email is set (required for 2FA)
+                    if not faculty.email:
+                        error_messages.append('Email address is required for login. Please contact administrator to add your email.')
+                        context = {'form': form, 'error_messages': error_messages}
+                        return render(request, 'login_page.html', context)
+                    
+                    # Generate OTP for 2FA
+                    otp = generate_otp()
+                    
+                    # Invalidate previous login OTPs for this faculty
+                    LoginOTP.objects.filter(faculty=faculty, is_used=False).update(is_used=True)
+                    
+                    # Create new login OTP
+                    login_otp = LoginOTP.objects.create(
+                        faculty=faculty,
+                        email=faculty.email,
+                        otp=otp,
+                        user_type='faculty'
+                    )
+                    
+                    # Send OTP email
+                    try:
+                        send_mail(
+                            subject='Login Verification OTP - eLMS',
+                            message=f'''Hello {faculty.name},
+
+You are attempting to login to your eLMS account.
+
+Your login verification OTP (One-Time Password) is: {otp}
+
+This OTP is valid for {getattr(settings, 'OTP_EXPIRY_MINUTES', 10)} minutes.
+
+If you did not attempt to login, please ignore this email and contact administrator immediately.
+
+Best regards,
+eLMS Team''',
+                            from_email=settings.DEFAULT_FROM_EMAIL,
+                            recipient_list=[faculty.email],
+                            fail_silently=False,
+                        )
+                        # Store pending login info in session
+                        request.session['pending_login_user_type'] = 'faculty'
+                        request.session['pending_login_id'] = str(faculty.faculty_id)
+                        request.session['pending_login_email'] = faculty.email
+                        messages.success(request, f'OTP has been sent to your email: {faculty.email}')
+                        return redirect('verifyLoginOTP')
+                    except Exception as e:
+                        logger.error(f"Error sending login OTP email: {str(e)}")
+                        login_otp.delete()
+                        error_messages.append('Failed to send OTP. Please check your email configuration or contact administrator.')
+                        context = {'form': form, 'error_messages': error_messages}
+                        return render(request, 'login_page.html', context)
             except Faculty.DoesNotExist:
                 pass
             
@@ -134,12 +231,127 @@ def std_login(request):
     return render(request, 'login_page.html', context)
 
 
+# Two-Factor Authentication - Verify Login OTP
+@csrf_protect
+@require_http_methods(["GET", "POST"])
+def verifyLoginOTP(request):
+    """Verify OTP for login 2FA"""
+    user_type = request.session.get('pending_login_user_type')
+    user_id = request.session.get('pending_login_id')
+    email = request.session.get('pending_login_email')
+    
+    if not user_type or not user_id or not email:
+        messages.error(request, 'Session expired. Please login again.')
+        return redirect('std_login')
+    
+    if request.method == 'POST':
+        otp = request.POST.get('otp', '').strip()
+        
+        if not otp:
+            messages.error(request, 'Please enter the OTP.')
+            return render(request, 'main/verifyLoginOTP.html', {'email': email})
+        
+        # Validate OTP format (6 digits)
+        if not otp.isdigit() or len(otp) != 6:
+            messages.error(request, 'OTP must be a 6-digit number.')
+            return render(request, 'main/verifyLoginOTP.html', {'email': email})
+        
+        try:
+            if user_type == 'student':
+                student = Student.objects.get(student_id=user_id, email=email)
+                login_otp = LoginOTP.objects.filter(
+                    student=student,
+                    email=email,
+                    otp=otp,
+                    is_used=False,
+                    user_type='student'
+                ).order_by('-created_at').first()
+                
+                if login_otp and not login_otp.is_expired():
+                    # Mark OTP as verified and used
+                    login_otp.is_verified = True
+                    login_otp.is_used = True
+                    login_otp.save()
+                    
+                    # Clear pending login session data
+                    request.session.pop('pending_login_user_type', None)
+                    request.session.pop('pending_login_id', None)
+                    request.session.pop('pending_login_email', None)
+                    
+                    # Complete login
+                    request.session['student_id'] = student.student_id
+                    # Check if email is set, if not, mark for popup
+                    if not student.email:
+                        request.session['show_email_popup'] = True
+                    
+                    messages.success(request, 'Login successful! Welcome back.')
+                    return redirect('myCourses')
+                else:
+                    if login_otp and login_otp.is_expired():
+                        messages.error(request, 'OTP has expired. Please login again.')
+                    else:
+                        messages.error(request, 'Invalid OTP. Please try again.')
+                    
+            elif user_type == 'faculty':
+                faculty = Faculty.objects.get(faculty_id=user_id, email=email)
+                login_otp = LoginOTP.objects.filter(
+                    faculty=faculty,
+                    email=email,
+                    otp=otp,
+                    is_used=False,
+                    user_type='faculty'
+                ).order_by('-created_at').first()
+                
+                if login_otp and not login_otp.is_expired():
+                    # Mark OTP as verified and used
+                    login_otp.is_verified = True
+                    login_otp.is_used = True
+                    login_otp.save()
+                    
+                    # Clear pending login session data
+                    request.session.pop('pending_login_user_type', None)
+                    request.session.pop('pending_login_id', None)
+                    request.session.pop('pending_login_email', None)
+                    
+                    # Complete login
+                    request.session['faculty_id'] = faculty.faculty_id
+                    
+                    messages.success(request, 'Login successful! Welcome back.')
+                    return redirect('facultyCourses')
+                else:
+                    if login_otp and login_otp.is_expired():
+                        messages.error(request, 'OTP has expired. Please login again.')
+                    else:
+                        messages.error(request, 'Invalid OTP. Please try again.')
+            else:
+                messages.error(request, 'Invalid user type. Please login again.')
+                return redirect('std_login')
+                
+        except (Student.DoesNotExist, Faculty.DoesNotExist):
+            messages.error(request, 'User not found. Please login again.')
+            # Clear session
+            request.session.pop('pending_login_user_type', None)
+            request.session.pop('pending_login_id', None)
+            request.session.pop('pending_login_email', None)
+            return redirect('std_login')
+        except Exception as e:
+            logger.error(f"Error in verifyLoginOTP: {str(e)}")
+            messages.error(request, 'An error occurred. Please try again.')
+    
+    return render(request, 'main/verifyLoginOTP.html', {'email': email})
+
+
 # Clears the session on logout
 @never_cache
 @csrf_protect
 @require_http_methods(["GET", "POST"])
 def std_logout(request):
+    # Clear all session data including pending login data
     request.session.flush()
+    # Also clear any pending login session variables explicitly
+    request.session.pop('pending_login_user_type', None)
+    request.session.pop('pending_login_id', None)
+    request.session.pop('pending_login_email', None)
     return redirect('std_login')
 
 

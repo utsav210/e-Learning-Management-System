@@ -1,7 +1,7 @@
 from django.contrib import admin
 
 # Register your models here.
-from .models import Student, Faculty, Course, Department, Assignment, Announcement, PasswordResetOTP
+from .models import Student, Faculty, Course, Department, Assignment, Announcement, PasswordResetOTP, LoginOTP
 
 
 class CourseAdmin(admin.ModelAdmin):
@@ -28,3 +28,4 @@ admin.site.register(Department)
 admin.site.register(Assignment)
 admin.site.register(Announcement)
 admin.site.register(PasswordResetOTP)
+admin.site.register(LoginOTP)

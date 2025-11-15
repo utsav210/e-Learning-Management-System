@@ -227,3 +227,29 @@ class PasswordResetOTP(models.Model):
         from datetime import timedelta
         expiry_time = self.created_at + timedelta(minutes=getattr(settings, 'OTP_EXPIRY_MINUTES', 10))
         return timezone.now() > expiry_time
+
+
+class LoginOTP(models.Model):
+    """Model to store OTP for two-factor authentication during login"""
+    student = models.ForeignKey(Student, on_delete=models.CASCADE, null=True, blank=True)
+    faculty = models.ForeignKey(Faculty, on_delete=models.CASCADE, null=True, blank=True)
+    email = models.EmailField(max_length=100, null=False)
+    otp = models.CharField(max_length=10, null=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    is_verified = models.BooleanField(default=False)
+    is_used = models.BooleanField(default=False)
+    user_type = models.CharField(max_length=10, choices=[('student', 'Student'), ('faculty', 'Faculty')], null=False)
+
+    class Meta:
+        verbose_name_plural = "Login OTPs"
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Login OTP for {self.email} ({self.user_type}) - {self.otp}"
+
+    def is_expired(self):
+        from django.utils import timezone
+        from django.conf import settings
+        from datetime import timedelta
+        expiry_time = self.created_at + timedelta(minutes=getattr(settings, 'OTP_EXPIRY_MINUTES', 10))
+        return timezone.now() > expiry_time

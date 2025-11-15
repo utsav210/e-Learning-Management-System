@@ -49,6 +49,7 @@ urlpatterns = [
     path('forgotPassword/', views.forgotPassword, name='forgotPassword'),
     path('verifyOTP/', views.verifyOTP, name='verifyOTP'),
     path('resetPassword/', views.resetPassword, name='resetPassword'),
+    path('verifyLoginOTP/', views.verifyLoginOTP, name='verifyLoginOTP'),
     path('saveEmail/', views.saveEmail, name='saveEmail'),
     path('changeEmail/', views.changeEmail, name='changeEmail'),
     path('search/', views.search, name='search'),
