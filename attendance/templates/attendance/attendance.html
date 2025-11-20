@@ -47,7 +47,7 @@
    <!-- navigation links end -->
 </div>
 <div class="container">
-   <div class="d-flex rounded flex-row p-2 border justify-content-end" style="background-color:rgb(250,250,250)">
+   <div class="d-flex rounded flex-row p-2 border justify-content-between align-items-center" style="background-color:rgb(250,250,250)">
       <div>
          <form method="POST" action="{% url 'createRecord' course.code %}">
             {% csrf_token %} 
@@ -57,18 +57,34 @@
             </button>
          </form>
       </div>
+      <form method="GET" action="{% url 'loadAttendanceRange' course.code %}" class="d-flex gap-2 align-items-center">
+         <input type="date" name="start" class="form-control" value="{{ start }}" placeholder="Start date">
+         <input type="date" name="end" class="form-control" value="{{ end }}" placeholder="End date">
+         <select name="status" class="form-select" style="max-width: 12rem;">
+            <option value="" {% if not status %}selected{% endif %}>All</option>
+            <option value="present" {% if status == 'present' %}selected{% endif %}>Present</option>
+            <option value="late" {% if status == 'late' %}selected{% endif %}>Late</option>
+            <option value="absent" {% if status == 'absent' %}selected{% endif %}>Absent</option>
+         </select>
+         <button type="submit" class="btn btn-sm btn-secondary">Filter</button>
+      </form>
    </div>
    <p>
-      {% if attendace %}
+      {% if attendance %}
       Attendance entry for {{date}}
       {% endif %}
    </p>
-   <div>
-      <form action="{% url 'loadAttendance' course.code %}"  method="post">
+   <div class="d-flex justify-content-between align-items-center mt-2">
+      <form action="{% url 'loadAttendance' course.code %}"  method="post" class="d-flex gap-2 align-items-center">
          {% csrf_token %}
-         <input type="date" name="date" required>
+         <button type="button" id="prevDay" class="btn btn-sm btn-outline-secondary">Prev</button>
+         <input type="date" name="date" id="singleDate" required value="{{ date }}">
+         <button type="button" id="nextDay" class="btn btn-sm btn-outline-secondary">Next</button>
          <button type="submit" class="btn btn-sm btn-success">Load</button>
       </form>
+      {% if attendance %}
+      <a class="btn btn-sm btn-success" href="{% url 'exportAttendance' course.code %}?date={{date}}&start={{start}}&end={{end}}&status={{status}}">Export CSV</a>
+      {% endif %}
    </div>
    <div class="table-responsive-sm">
    <table class="table my-3 text-center">
@@ -78,7 +94,7 @@
             <th scope="col">ID</th>
             <th scope="col">Total Absence</th>
             <th scope="col">Total Present</th>
-            <th scope="col" colspan="2">Attendance</th>
+            <th scope="col" colspan="3">Attendance</th>
          </tr>
       </thead>
       <tbody class="table-group-divider">
@@ -86,22 +102,28 @@
             {% csrf_token %}
             {% for attendance in attendance %}
             <tr class="text-center">
-               <td><img class="align-self-baseline rounded-circle" src="/media/{{ attendance.student.photo}}" alt="image"
+               <td><img class="align-self-baseline rounded-circle" src="{{ attendance.student.photo.url }}" alt="image"
                   style="height: 4rem;width:4rem;"></td>
                <td>{{attendance.student.name}}</td>
                <td>{{attendance.student.student_id}}</td>
                <td>{{attendance.total_absent}}</td>
                <td>{{attendance.total_present}}</td>
-               <td >
+               <td>
                   <div class="form-check form-check-inline">
-                     <input class="form-check-input" type="radio" name="{{attendance.student.student_id}}" id="inlineRadio1{{forloop.counter}}" value="1">
-                     <label class="form-check-label" for="inlineRadio1{{forloop.counter}}">Present</label>
+                    <input class="form-check-input" type="radio" name="{{attendance.student.student_id}}" id="inlineRadio1{{forloop.counter}}" value="present">
+                    <label class="form-check-label" for="inlineRadio1{{forloop.counter}}">Present</label>
                   </div>
                </td>
                <td>
                   <div class="form-check form-check-inline">
-                     <input class="form-check-input" type="radio" name="{{attendance.student.student_id}}" id="inlineRadio2{{forloop.counter}}" value="0">
-                     <label class="form-check-label" for="inlineRadio2{{forloop.counter}}">Absent</label>
+                    <input class="form-check-input" type="radio" name="{{attendance.student.student_id}}" id="inlineRadio2{{forloop.counter}}" value="0">
+                    <label class="form-check-label" for="inlineRadio2{{forloop.counter}}">Absent</label>
+                  </div>
+               </td>
+               <td>
+                  <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="radio" name="{{attendance.student.student_id}}" id="inlineRadio3{{forloop.counter}}" value="late">
+                    <label class="form-check-label" for="inlineRadio3{{forloop.counter}}">Late</label>
                   </div>
                </td>
             </tr>
@@ -116,16 +138,80 @@
    <span>
    </span> 
    <a href=" {% url 'faculty' course.code %}" class="btn btn-sm btn-danger">Discard</a>
-   <button type="submit" class="btn btn-sm btn-primary px-3 mx-1">Save</button>
+   <button type="submit" class="btn btn-sm btn-primary px-3 mx-1" id="saveAttendance">Save</button>
    </form>
+   </div>
+
+   <div class="d-flex justify-content-between align-items-center mt-2">
+      <div>
+         <button type="button" class="btn btn-outline-secondary btn-sm" id="markAllPresent">Mark all Present</button>
+         <button type="button" class="btn btn-outline-secondary btn-sm" id="markAllAbsent">Mark all Absent</button>
+         <button type="button" class="btn btn-outline-secondary btn-sm" id="markAllLate">Mark all Late</button>
+      </div>
+      <div class="text-muted">
+         <span id="syncStatus">Idle</span>
+      </div>
    </div>
 </div>
 
 <script>
-   $(document).ready(function(){
-     setTimeout(function(){
-       $(".alert").alert('close');
-     },4000);
-   });
+   (function(){
+     function closeAlerts(){
+       setTimeout(function(){
+         var alerts = document.querySelectorAll('.alert');
+         alerts.forEach(function(el){
+           try { bootstrap.Alert.getOrCreateInstance(el).close(); } catch(e) {}
+         });
+       }, 4000);
+     }
+     closeAlerts();
+
+     function setAll(value){
+       document.querySelectorAll('input.form-check-input[type="radio"]').forEach(function(r){
+         if (r.value === value) { r.checked = true; }
+       });
+     }
+     document.getElementById('markAllPresent')?.addEventListener('click', function(){ setAll('present'); });
+     document.getElementById('markAllAbsent')?.addEventListener('click', function(){ setAll('0'); });
+     document.getElementById('markAllLate')?.addEventListener('click', function(){ setAll('late'); });
+
+     var saveBtn = document.getElementById('saveAttendance');
+     var syncStatus = document.getElementById('syncStatus');
+     if (saveBtn) saveBtn.addEventListener('click', function(e){
+       e.preventDefault();
+       syncStatus.textContent = 'Syncing…';
+       var form = saveBtn.closest('form');
+       var formData = new FormData(form);
+       formData.append('ajax', 'true');
+       formData.append('client_ts', String(Date.now()));
+       fetch(form.action, { method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest' }, body: formData })
+         .then(function(res){ return res.json(); })
+         .then(function(json){
+           if (json && json.success) {
+             if (json.conflicts && json.conflicts > 0) {
+               syncStatus.textContent = 'Conflict — refresh needed';
+             } else {
+               syncStatus.textContent = 'Saved';
+             }
+           } else {
+             syncStatus.textContent = 'Error — retrying…';
+             setTimeout(function(){ saveBtn.click(); }, 1500);
+           }
+         })
+         .catch(function(){
+           syncStatus.textContent = 'Network error — retrying…';
+           setTimeout(function(){ saveBtn.click(); }, 1500);
+         });
+     });
+   })();
 </script>
 {% endblock %}
+     var input = document.getElementById('singleDate');
+     document.getElementById('prevDay')?.addEventListener('click', function(){
+       if (!input) return; var d = new Date(input.value || Date.now()); d.setDate(d.getDate()-1);
+       input.value = d.toISOString().slice(0,10);
+     });
+     document.getElementById('nextDay')?.addEventListener('click', function(){
+       if (!input) return; var d = new Date(input.value || Date.now()); d.setDate(d.getDate()+1);
+       input.value = d.toISOString().slice(0,10);
+     });

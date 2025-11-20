@@ -7,4 +7,6 @@ urlpatterns = [
     path('submitAttendance/<int:code>',
          views.submitAttendance, name='submitAttendance'),
     path('loadAttendance/<int:code>', views.loadAttendance, name='loadAttendance'),
+    path('attendance/filter/<int:code>', views.loadAttendanceRange, name='loadAttendanceRange'),
+    path('attendance/export/<int:code>', views.exportAttendance, name='exportAttendance'),
 ]
