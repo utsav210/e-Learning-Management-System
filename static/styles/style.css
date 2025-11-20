@@ -1,14 +1,15 @@
 @import url("https://fonts.googleapis.com/css2?family=Inter&display=swap");
 @import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@700&display=swap");
 
+/* Theme synchronization: map app variables to navbar (md-*) palette */
 :root {
-  --edu-bg: #0a0a30;
-  --edu-primary: #0b6ab8;
-  --edu-primary-600: #0e5ea0;
-  --edu-accent: #22c3a6;
-  --edu-accent-600: #15a78c;
+  --edu-bg: var(--md-bg, #f5f7fb);
+  --edu-primary: var(--md-primary, #1a73e8);
+  --edu-primary-600: color-mix(in srgb, var(--md-primary, #1a73e8) 85%, #0b3c8a 15%);
+  --edu-accent: var(--md-secondary, #673ab7);
+  --edu-accent-600: color-mix(in srgb, var(--md-secondary, #673ab7) 85%, #3b1a73 15%);
   --edu-surface: #ffffff;
-  --edu-surface-2: #f6f8fb;
+  --edu-surface-2: var(--md-bg, #f5f7fb);
   --edu-muted: #6b7280;
   --edu-text: #111827;
   --edu-border: #e5e7eb;

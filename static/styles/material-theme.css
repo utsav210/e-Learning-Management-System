@@ -1,0 +1,152 @@
+/* Material-inspired theme for eLMS */
+:root {
+  --md-primary: #1a73e8;
+  --md-on-primary: #ffffff;
+  --md-secondary: #673ab7;
+  --md-surface: #ffffff;
+  --md-bg: #f5f7fb;
+  --md-success: #2e7d32;
+  --md-warning: #f9a825;
+  --md-danger: #c62828;
+  --md-shadow: 0 8px 16px rgba(0,0,0,0.12);
+}
+
+html, body {
+  background: var(--md-bg);
+  color: #1f2937;
+}
+
+.navbar {
+  backdrop-filter: saturate(180%) blur(8px);
+  box-shadow: var(--md-shadow);
+}
+
+/* Modern gradient navbar theme */
+.navbar-mod {
+  background: linear-gradient(135deg, var(--md-primary) 0%, var(--md-secondary) 60%, var(--md-primary) 100%);
+}
+.navbar-mod .navbar-brand,
+.navbar-mod .nav-link,
+.navbar-mod .btn,
+.navbar-mod .form-control {
+  color: var(--md-on-primary) !important;
+}
+.navbar-mod .nav-link {
+  color: rgba(255,255,255,0.85) !important;
+  transition: color .12s ease, opacity .12s ease;
+}
+.navbar-mod .nav-link:hover {
+  color: #fff !important;
+  opacity: 1;
+}
+.navbar-mod .nav-link.active {
+  color: #fff !important;
+}
+.navbar-mod .navbar-toggler {
+  border-color: rgba(255,255,255,0.4);
+}
+.navbar-mod .navbar-toggler:focus {
+  box-shadow: 0 0 0 .2rem rgba(255,255,255,.25);
+}
+.navbar-mod .searchbar::placeholder {
+  color: rgba(255,255,255,0.75);
+}
+.navbar-mod .searchbar:focus {
+  border-color: rgba(255,255,255,0.85) !important;
+}
+
+/* Search input and button refinement */
+.navbar-mod .navbar-collapse form.d-flex {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+}
+.navbar-mod #searchIn {
+  flex: 1 1 320px;
+  min-width: 180px;
+  max-width: 460px;
+  height: 36px;
+  padding: .45rem .8rem;
+  background-color: #ffffff !important;
+  color: #1f2937 !important;
+  border: 1px solid rgba(0,0,0,0.12) !important;
+  border-radius: 12px !important;
+  box-shadow: inset 0 1px 2px rgba(0,0,0,.06);
+  transition: border-color .15s ease, box-shadow .15s ease, width .15s ease;
+}
+.navbar-mod #searchIn::placeholder { color: #6b7280; opacity: .85; }
+.navbar-mod #searchIn:not(:focus) { text-overflow: ellipsis; white-space: nowrap; overflow: hidden; }
+.navbar-mod #searchIn:focus {
+  border-color: rgba(26,115,232,.6) !important;
+  box-shadow: 0 0 0 .2rem rgba(26,115,232,.2) !important;
+}
+.navbar-mod #searchBtn {
+  height: 36px;
+  padding: 0 .9rem;
+  min-width: max-content;
+  border-radius: 12px !important;
+  border-color: rgba(255,255,255,0.85) !important;
+  color: #ffffff !important;
+  transition: background-color .15s ease, padding .15s ease;
+}
+.navbar-mod #searchBtn:hover { background-color: rgba(255,255,255,.15); }
+.navbar-mod #searchBtn:focus-visible { outline: none; box-shadow: 0 0 0 .2rem rgba(255,255,255,.35); }
+
+@media (max-width: 992px) {
+  .navbar-mod #searchIn { flex-basis: 240px; }
+}
+
+.navbar-brand {
+  font-weight: 800;
+  letter-spacing: 0.5px;
+}
+
+.navbar-mod .nav-link { position: relative; display: inline-block; }
+.nav-link.active { position: relative; }
+/* Accessibility note: underline pseudo-element removed to prevent spillover
+   while maintaining hover/active color changes and focus rings */
+
+.nav-link:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 .2rem rgba(255,255,255,.35);
+  border-radius: 6px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .navbar-mod .nav-link { transition: none; }
+}
+
+.btn-primary {
+  background: var(--md-primary);
+  border: none;
+  box-shadow: var(--md-shadow);
+}
+.btn-primary:hover { filter: brightness(1.05); }
+
+.card {
+  border: none;
+  box-shadow: var(--md-shadow);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.card:hover { transform: translateY(-3px); box-shadow: 0 12px 24px rgba(0,0,0,0.14); }
+
+.breadcrumb { background: transparent; }
+.breadcrumb .breadcrumb-item a { text-decoration: none; }
+
+/* Hero utilities */
+.hero {
+  background: linear-gradient(135deg, rgba(26,115,232,0.08), rgba(103,58,183,0.08));
+  border-radius: 16px;
+}
+
+/* Ripple effect */
+.ripple-container { position: relative; overflow: hidden; }
+.ripple { position: absolute; border-radius: 50%; transform: scale(0); animation: ripple 600ms linear; background-color: rgba(255,255,255,0.6); }
+@keyframes ripple { to { transform: scale(4); opacity: 0; } }
+
+/* Form helpers */
+.form-text { font-size: 0.85rem; }
+.form-control:focus { box-shadow: 0 0 0 .2rem rgba(26,115,232,.25); }
+
+/* Footer */
+.app-footer { color: #6b7280; }

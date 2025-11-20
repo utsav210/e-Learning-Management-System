@@ -1,13 +1,14 @@
 /* Education-themed global enhancements
    Scope: purely presentational; no class or DOM changes required in templates */
 
+/* Theme synchronization: use navbar material variables to drive shared UI */
 :root {
-  --edu-bg: #0a0a30;
-  --edu-primary: #0b6ab8;
-  --edu-primary-600: #0e5ea0;
-  --edu-accent: #22c3a6;
+  --edu-bg: var(--md-bg, #f5f7fb);
+  --edu-primary: var(--md-primary, #1a73e8);
+  --edu-primary-600: color-mix(in srgb, var(--md-primary, #1a73e8) 85%, #0b3c8a 15%);
+  --edu-accent: var(--md-secondary, #673ab7);
   --edu-surface: #ffffff;
-  --edu-surface-2: #f6f8fb;
+  --edu-surface-2: var(--md-bg, #f5f7fb);
   --edu-muted: #6b7280;
   --edu-text: #111827;
   --edu-border: #e5e7eb;
@@ -27,13 +28,13 @@
   box-shadow: 0 10px 24px rgba(0,0,0,0.08);
 }
 .card .card-header {
-  background: linear-gradient(180deg, rgba(10,10,48,1) 0%, rgba(10,10,48,.94) 100%);
+  background: linear-gradient(135deg, var(--md-primary, #1a73e8) 0%, var(--md-secondary, #673ab7) 60%, var(--md-primary, #1a73e8) 100%);
   color: #fff;
   border-bottom: none;
 }
 .card .card-footer {
-  background: #0a0a30;
-  color: #e5e7eb;
+  background: linear-gradient(135deg, var(--md-primary, #1a73e8) 0%, var(--md-secondary, #673ab7) 60%, var(--md-primary, #1a73e8) 100%);
+  color: #fff;
   border-top: none;
 }
 
@@ -165,5 +166,3 @@
 @media (max-width: 992px) {
   .card { border-radius: 12px; }
 }
-*** End Patch
-
