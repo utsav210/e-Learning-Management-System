@@ -1,0 +1,351 @@
+SECURITY FIXES VERIFICATION TEST REPORT
+================================================================================
+Test Run Date: 2025-11-20 12:14:42
+
+test_check_password_backward_compatibility (tests.test_password_security.PasswordHashingTests.test_check_password_backward_compatibility)
+Test backward compatibility with plaintext passwords ... ok
+test_check_password_with_hashed (tests.test_password_security.PasswordHashingTests.test_check_password_with_hashed)
+Test password checking with hashed password ... ok
+test_hash_password_creates_hash (tests.test_password_security.PasswordHashingTests.test_hash_password_creates_hash)
+Test that hash_password creates a hashed password ... ok
+test_password_migration_on_login (tests.test_password_security.PasswordHashingTests.test_password_migration_on_login)
+Test that plaintext passwords are migrated to hashed on login ... ok
+test_minimum_password_length (tests.test_password_security.PasswordPolicyTests.test_minimum_password_length)
+Test that minimum password length is enforced (8 characters) ... ok
+test_otp_is_random (tests.test_otp_security.OTPGenerationTests.test_otp_is_random)
+Test that OTPs are not predictable ... ok
+test_otp_is_six_digits (tests.test_otp_security.OTPGenerationTests.test_otp_is_six_digits)
+Test that OTP is always 6 digits ... ok
+test_otp_not_sequential (tests.test_otp_security.OTPGenerationTests.test_otp_not_sequential)
+Test that OTPs are not sequential ... ok
+test_otp_range (tests.test_otp_security.OTPGenerationTests.test_otp_range)
+Test that OTPs are in valid range (100000-999999) ... ok
+test_otp_uses_secrets_module (tests.test_otp_security.OTPGenerationTests.test_otp_uses_secrets_module)
+Test that OTP generation uses secrets module (cryptographically secure) ... ok
+test_session_cookie_secure_in_production (tests.test_session_security.SessionStorageTests.test_session_cookie_secure_in_production)
+Test that session cookies are secure in production ... ok
+test_session_engine_is_database (tests.test_session_security.SessionStorageTests.test_session_engine_is_database)
+Test that session engine is database-backed, not signed cookies ... ok
+test_session_regeneration_after_login (tests.test_session_security.SessionFixationTests.test_session_regeneration_after_login)
+Test that session ID is regenerated after login ... ok
+test_rate_limit_applied_to_forgot_password (tests.test_rate_limiting.RateLimitingTests.test_rate_limit_applied_to_forgot_password)
+Test that forgotPassword view has rate limiting ... ok
+test_rate_limit_applied_to_otp_verification (tests.test_rate_limiting.RateLimitingTests.test_rate_limit_applied_to_otp_verification)
+Test that verifyLoginOTP view has rate limiting ... ok
+test_rate_limit_blocks_after_max_requests (tests.test_rate_limiting.RateLimitingTests.test_rate_limit_blocks_after_max_requests)
+Test that rate limiting blocks requests after max attempts ... ok
+test_rate_limit_decorator_exists (tests.test_rate_limiting.RateLimitingTests.test_rate_limit_decorator_exists)
+Test that rate_limit decorator exists ... ok
+test_rate_limit_resets_after_window (tests.test_rate_limiting.RateLimitingTests.test_rate_limit_resets_after_window)
+Test that rate limit resets after time window ... ok
+test_bleach_import_error_fallback_strips_html (tests.test_xss_prevention.XSSPreventionTests.test_bleach_import_error_fallback_strips_html) ... ok
+test_form_clean_description_applies_sanitization (tests.test_xss_prevention.XSSPreventionTests.test_form_clean_description_applies_sanitization) ... ok
+test_html_sanitizer_removes_disallowed_tags (tests.test_xss_prevention.XSSPreventionTests.test_html_sanitizer_removes_disallowed_tags) ... ok
+test_html_sanitizer_removes_event_handlers (tests.test_xss_prevention.XSSPreventionTests.test_html_sanitizer_removes_event_handlers) ... ok
+test_html_sanitizer_removes_script_tags (tests.test_xss_prevention.XSSPreventionTests.test_html_sanitizer_removes_script_tags) ... ok
+test_link_protocol_sanitization (tests.test_xss_prevention.XSSPreventionTests.test_link_protocol_sanitization) ... ok
+test_quiz_text_sanitizer_strips_html (tests.test_xss_prevention.XSSPreventionTests.test_quiz_text_sanitizer_strips_html) ... ok
+test_span_style_allowed_only_for_span (tests.test_xss_prevention.XSSPreventionTests.test_span_style_allowed_only_for_span) ... ok
+test_authorization_logs_unresolvable_profile (tests.test_authorization.AuthorizationTests.test_authorization_logs_unresolvable_profile)
+Profile view logs errors when user reference is invalid ... ERROR
+test_profile_authorized_access_renders_profile (tests.test_authorization.AuthorizationTests.test_profile_authorized_access_renders_profile)
+Authorized user can access own profile (prevents IDOR) ... ERROR
+test_profile_prevents_unauthorized_access (tests.test_authorization.AuthorizationTests.test_profile_prevents_unauthorized_access)
+User cannot access another user's profile (Broken Access Control) ... ERROR
+test_allowed_hosts_not_wildcard (tests.test_security_config.SecurityConfigurationTests.test_allowed_hosts_not_wildcard)
+Test that ALLOWED_HOSTS is not wildcard '*' ... ok
+test_csrf_protection_enabled (tests.test_security_config.SecurityConfigurationTests.test_csrf_protection_enabled)
+Test that CSRF protection is enabled ... ok
+test_debug_defaults_to_false (tests.test_security_config.SecurityConfigurationTests.test_debug_defaults_to_false)
+Test that DEBUG defaults to False (requires explicit setting) ... ok
+test_secret_key_not_hardcoded (tests.test_security_config.SecurityConfigurationTests.test_secret_key_not_hardcoded)
+Test that SECRET_KEY is not hardcoded with fallback ... ok
+test_security_headers_configured (tests.test_security_config.SecurityConfigurationTests.test_security_headers_configured)
+Test that security headers are configured ... ok
+test_grade_submission_uses_get_method (tests.test_post_data_access.SafeDataAccessTests.test_grade_submission_uses_get_method)
+Test that gradeSubmission uses .get() instead of direct access ... ok
+test_no_direct_post_access (tests.test_post_data_access.SafeDataAccessTests.test_no_direct_post_access)
+Test that views don't use direct POST dictionary access ... ok
+
+======================================================================
+ERROR: test_authorization_logs_unresolvable_profile (tests.test_authorization.AuthorizationTests.test_authorization_logs_unresolvable_profile)
+Profile view logs errors when user reference is invalid
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\Django Framework\eLMS\Learning-management-system-using-Django-main\myenv\Lib\site-packages\django\db\backends\utils.py", line 105, in _execute
+    return self.cursor.execute(sql, params)
+           ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "D:\Django Framework\eLMS\Learning-management-system-using-Django-main\myenv\Lib\site-packages\django\db\backends\sqlite3\base.py", line 360, in execute
+    return super().execute(query, params)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^
+sqlite3.IntegrityError: UNIQUE constraint failed: main_department.department_id
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "D:\Django Framework\eLMS\Learning-management-system-using-Django-main\Learning-management-system-using-Django-main\tests\test_authorization.py", line 29, in setUp
+    self.dept = Department.objects.create(department_id=1, name="CSE")
+                ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Django Framework\eLMS\Learning-management-system-using-Django-main\myenv\Lib\site-packages\django\db\models\manager.py", line 87, in manager_method
+    return getattr(self.get_queryset(), name)(*args, **kwargs)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "D:\Django Framework\eLMS\Learning-management-system-using-Django-main\myenv\Lib\site-packages\django\db\models\query.py", line 665, in create
+    obj.save(force_insert=True, using=self.db)
+    ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Django Framework\eLMS\Learning-management-system-using-Django-main\myenv\Lib\site-packages\django\db\models\base.py", line 902, in save
+    self.save_base(
+    ~~~~~~~~~~~~~~^
+        using=using,
+        ^^^^^^^^^^^^
+    ...<2 lines>...
+        update_fields=update_fields,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "D:\Django Framework\eLMS\Learning-management-system-using-Django-main\myenv\Lib\site-packages\django\db\models\base.py", line 1008, in save_base
+    updated = self._save_table(
+        raw,
+    ...<4 lines>...
+        update_fields,
+    )
+  File "D:\Django Framework\eLMS\Learning-management-system-using-Django-main\myenv\Lib\site-packages\django\db\models\base.py", line 1169, in _save_table
+    results = self._do_insert(
+        cls._base_manager, using, fields, returning_fields, raw
+    )
+  File "D:\Django Framework\eLMS\Learning-management-system-using-Django-main\myenv\Lib\site-packages\django\db\models\base.py", line 1210, in _do_insert
+    return manager._insert(
+           ~~~~~~~~~~~~~~~^
+        [self],
+        ^^^^^^^
+    ...<3 lines>...
+        raw=raw,
+        ^^^^^^^^
+    )
+    ^
+  File "D:\Django Framework\eLMS\Learning-management-system-using-Django-main\myenv\Lib\site-packages\django\db\models\manager.py", line 87, in manager_method
+    return getattr(self.get_queryset(), name)(*args, **kwargs)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "D:\Django Framework\eLMS\Learning-management-system-using-Django-main\myenv\Lib\site-packages\django\db\models\query.py", line 1873, in _insert
+    return query.get_compiler(using=using).execute_sql(returning_fields)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "D:\Django Framework\eLMS\Learning-management-system-using-Django-main\myenv\Lib\site-packages\django\db\models\sql\compiler.py", line 1882, in execute_sql
+    cursor.execute(sql, params)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "D:\Django Framework\eLMS\Learning-management-system-using-Django-main\myenv\Lib\site-packages\django\db\backends\utils.py", line 122, in execute
+    return super().execute(sql, params)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "D:\Django Framework\eLMS\Learning-management-system-using-Django-main\myenv\Lib\site-packages\django\db\backends\utils.py", line 79, in execute
+    return self._execute_with_wrappers(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        sql, params, many=False, executor=self._execute
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "D:\Django Framework\eLMS\Learning-management-system-using-Django-main\myenv\Lib\site-packages\django\db\backends\utils.py", line 92, in _execute_with_wrappers
+    return executor(sql, params, many, context)
+  File "D:\Django Framework\eLMS\Learning-management-system-using-Django-main\myenv\Lib\site-packages\django\db\backends\utils.py", line 100, in _execute
+    with self.db.wrap_database_errors:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Django Framework\eLMS\Learning-management-system-using-Django-main\myenv\Lib\site-packages\django\db\utils.py", line 91, in __exit__
+    raise dj_exc_value.with_traceback(traceback) from exc_value
+  File "D:\Django Framework\eLMS\Learning-management-system-using-Django-main\myenv\Lib\site-packages\django\db\backends\utils.py", line 105, in _execute
+    return self.cursor.execute(sql, params)
+           ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "D:\Django Framework\eLMS\Learning-management-system-using-Django-main\myenv\Lib\site-packages\django\db\backends\sqlite3\base.py", line 360, in execute
+    return super().execute(query, params)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^
+django.db.utils.IntegrityError: UNIQUE constraint failed: main_department.department_id
+
+======================================================================
+ERROR: test_profile_authorized_access_renders_profile (tests.test_authorization.AuthorizationTests.test_profile_authorized_access_renders_profile)
+Authorized user can access own profile (prevents IDOR)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\Django Framework\eLMS\Learning-management-system-using-Django-main\myenv\Lib\site-packages\django\db\backends\utils.py", line 105, in _execute
+    return self.cursor.execute(sql, params)
+           ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "D:\Django Framework\eLMS\Learning-management-system-using-Django-main\myenv\Lib\site-packages\django\db\backends\sqlite3\base.py", line 360, in execute
+    return super().execute(query, params)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^
+sqlite3.IntegrityError: UNIQUE constraint failed: main_department.department_id
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "D:\Django Framework\eLMS\Learning-management-system-using-Django-main\Learning-management-system-using-Django-main\tests\test_authorization.py", line 29, in setUp
+    self.dept = Department.objects.create(department_id=1, name="CSE")
+                ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Django Framework\eLMS\Learning-management-system-using-Django-main\myenv\Lib\site-packages\django\db\models\manager.py", line 87, in manager_method
+    return getattr(self.get_queryset(), name)(*args, **kwargs)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "D:\Django Framework\eLMS\Learning-management-system-using-Django-main\myenv\Lib\site-packages\django\db\models\query.py", line 665, in create
+    obj.save(force_insert=True, using=self.db)
+    ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Django Framework\eLMS\Learning-management-system-using-Django-main\myenv\Lib\site-packages\django\db\models\base.py", line 902, in save
+    self.save_base(
+    ~~~~~~~~~~~~~~^
+        using=using,
+        ^^^^^^^^^^^^
+    ...<2 lines>...
+        update_fields=update_fields,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "D:\Django Framework\eLMS\Learning-management-system-using-Django-main\myenv\Lib\site-packages\django\db\models\base.py", line 1008, in save_base
+    updated = self._save_table(
+        raw,
+    ...<4 lines>...
+        update_fields,
+    )
+  File "D:\Django Framework\eLMS\Learning-management-system-using-Django-main\myenv\Lib\site-packages\django\db\models\base.py", line 1169, in _save_table
+    results = self._do_insert(
+        cls._base_manager, using, fields, returning_fields, raw
+    )
+  File "D:\Django Framework\eLMS\Learning-management-system-using-Django-main\myenv\Lib\site-packages\django\db\models\base.py", line 1210, in _do_insert
+    return manager._insert(
+           ~~~~~~~~~~~~~~~^
+        [self],
+        ^^^^^^^
+    ...<3 lines>...
+        raw=raw,
+        ^^^^^^^^
+    )
+    ^
+  File "D:\Django Framework\eLMS\Learning-management-system-using-Django-main\myenv\Lib\site-packages\django\db\models\manager.py", line 87, in manager_method
+    return getattr(self.get_queryset(), name)(*args, **kwargs)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "D:\Django Framework\eLMS\Learning-management-system-using-Django-main\myenv\Lib\site-packages\django\db\models\query.py", line 1873, in _insert
+    return query.get_compiler(using=using).execute_sql(returning_fields)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "D:\Django Framework\eLMS\Learning-management-system-using-Django-main\myenv\Lib\site-packages\django\db\models\sql\compiler.py", line 1882, in execute_sql
+    cursor.execute(sql, params)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "D:\Django Framework\eLMS\Learning-management-system-using-Django-main\myenv\Lib\site-packages\django\db\backends\utils.py", line 122, in execute
+    return super().execute(sql, params)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "D:\Django Framework\eLMS\Learning-management-system-using-Django-main\myenv\Lib\site-packages\django\db\backends\utils.py", line 79, in execute
+    return self._execute_with_wrappers(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        sql, params, many=False, executor=self._execute
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "D:\Django Framework\eLMS\Learning-management-system-using-Django-main\myenv\Lib\site-packages\django\db\backends\utils.py", line 92, in _execute_with_wrappers
+    return executor(sql, params, many, context)
+  File "D:\Django Framework\eLMS\Learning-management-system-using-Django-main\myenv\Lib\site-packages\django\db\backends\utils.py", line 100, in _execute
+    with self.db.wrap_database_errors:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Django Framework\eLMS\Learning-management-system-using-Django-main\myenv\Lib\site-packages\django\db\utils.py", line 91, in __exit__
+    raise dj_exc_value.with_traceback(traceback) from exc_value
+  File "D:\Django Framework\eLMS\Learning-management-system-using-Django-main\myenv\Lib\site-packages\django\db\backends\utils.py", line 105, in _execute
+    return self.cursor.execute(sql, params)
+           ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "D:\Django Framework\eLMS\Learning-management-system-using-Django-main\myenv\Lib\site-packages\django\db\backends\sqlite3\base.py", line 360, in execute
+    return super().execute(query, params)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^
+django.db.utils.IntegrityError: UNIQUE constraint failed: main_department.department_id
+
+======================================================================
+ERROR: test_profile_prevents_unauthorized_access (tests.test_authorization.AuthorizationTests.test_profile_prevents_unauthorized_access)
+User cannot access another user's profile (Broken Access Control)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\Django Framework\eLMS\Learning-management-system-using-Django-main\myenv\Lib\site-packages\django\db\backends\utils.py", line 105, in _execute
+    return self.cursor.execute(sql, params)
+           ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "D:\Django Framework\eLMS\Learning-management-system-using-Django-main\myenv\Lib\site-packages\django\db\backends\sqlite3\base.py", line 360, in execute
+    return super().execute(query, params)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^
+sqlite3.IntegrityError: UNIQUE constraint failed: main_department.department_id
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "D:\Django Framework\eLMS\Learning-management-system-using-Django-main\Learning-management-system-using-Django-main\tests\test_authorization.py", line 29, in setUp
+    self.dept = Department.objects.create(department_id=1, name="CSE")
+                ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Django Framework\eLMS\Learning-management-system-using-Django-main\myenv\Lib\site-packages\django\db\models\manager.py", line 87, in manager_method
+    return getattr(self.get_queryset(), name)(*args, **kwargs)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "D:\Django Framework\eLMS\Learning-management-system-using-Django-main\myenv\Lib\site-packages\django\db\models\query.py", line 665, in create
+    obj.save(force_insert=True, using=self.db)
+    ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Django Framework\eLMS\Learning-management-system-using-Django-main\myenv\Lib\site-packages\django\db\models\base.py", line 902, in save
+    self.save_base(
+    ~~~~~~~~~~~~~~^
+        using=using,
+        ^^^^^^^^^^^^
+    ...<2 lines>...
+        update_fields=update_fields,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "D:\Django Framework\eLMS\Learning-management-system-using-Django-main\myenv\Lib\site-packages\django\db\models\base.py", line 1008, in save_base
+    updated = self._save_table(
+        raw,
+    ...<4 lines>...
+        update_fields,
+    )
+  File "D:\Django Framework\eLMS\Learning-management-system-using-Django-main\myenv\Lib\site-packages\django\db\models\base.py", line 1169, in _save_table
+    results = self._do_insert(
+        cls._base_manager, using, fields, returning_fields, raw
+    )
+  File "D:\Django Framework\eLMS\Learning-management-system-using-Django-main\myenv\Lib\site-packages\django\db\models\base.py", line 1210, in _do_insert
+    return manager._insert(
+           ~~~~~~~~~~~~~~~^
+        [self],
+        ^^^^^^^
+    ...<3 lines>...
+        raw=raw,
+        ^^^^^^^^
+    )
+    ^
+  File "D:\Django Framework\eLMS\Learning-management-system-using-Django-main\myenv\Lib\site-packages\django\db\models\manager.py", line 87, in manager_method
+    return getattr(self.get_queryset(), name)(*args, **kwargs)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "D:\Django Framework\eLMS\Learning-management-system-using-Django-main\myenv\Lib\site-packages\django\db\models\query.py", line 1873, in _insert
+    return query.get_compiler(using=using).execute_sql(returning_fields)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "D:\Django Framework\eLMS\Learning-management-system-using-Django-main\myenv\Lib\site-packages\django\db\models\sql\compiler.py", line 1882, in execute_sql
+    cursor.execute(sql, params)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "D:\Django Framework\eLMS\Learning-management-system-using-Django-main\myenv\Lib\site-packages\django\db\backends\utils.py", line 122, in execute
+    return super().execute(sql, params)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "D:\Django Framework\eLMS\Learning-management-system-using-Django-main\myenv\Lib\site-packages\django\db\backends\utils.py", line 79, in execute
+    return self._execute_with_wrappers(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        sql, params, many=False, executor=self._execute
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "D:\Django Framework\eLMS\Learning-management-system-using-Django-main\myenv\Lib\site-packages\django\db\backends\utils.py", line 92, in _execute_with_wrappers
+    return executor(sql, params, many, context)
+  File "D:\Django Framework\eLMS\Learning-management-system-using-Django-main\myenv\Lib\site-packages\django\db\backends\utils.py", line 100, in _execute
+    with self.db.wrap_database_errors:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Django Framework\eLMS\Learning-management-system-using-Django-main\myenv\Lib\site-packages\django\db\utils.py", line 91, in __exit__
+    raise dj_exc_value.with_traceback(traceback) from exc_value
+  File "D:\Django Framework\eLMS\Learning-management-system-using-Django-main\myenv\Lib\site-packages\django\db\backends\utils.py", line 105, in _execute
+    return self.cursor.execute(sql, params)
+           ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "D:\Django Framework\eLMS\Learning-management-system-using-Django-main\myenv\Lib\site-packages\django\db\backends\sqlite3\base.py", line 360, in execute
+    return super().execute(query, params)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^
+django.db.utils.IntegrityError: UNIQUE constraint failed: main_department.department_id
+
+----------------------------------------------------------------------
+Ran 36 tests in 3.350s
+
+FAILED (errors=3)
+
+================================================================================
+SUMMARY
+================================================================================
+Total Tests: 36
+Passed: 33
+Failed: 0
+Errors: 3
+
+CRITICAL Issues Resolved: 4
+HIGH Issues Resolved: 4
