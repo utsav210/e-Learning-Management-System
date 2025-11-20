@@ -7,10 +7,7 @@
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <title>Log in | eLMS</title>
       
-      <!-- Security Headers -->
-      <meta http-equiv="X-Content-Type-Options" content="nosniff">
-      <meta http-equiv="X-Frame-Options" content="DENY">
-      <meta http-equiv="X-XSS-Protection" content="1; mode=block">
+      <!-- Security headers are set via Django middleware and settings -->
       
       <!-- Favicon and Icons -->
       <link rel="apple-touch-icon" sizes="180x180" href="{% static 'images/icon/apple-touch-icon.png' %}">
@@ -23,15 +20,16 @@
       <link rel="stylesheet" href="{% static 'styles/style.css' %}">
       <link rel="stylesheet" href="{% static 'styles/theme-edu.css' %}">
       <link rel="stylesheet" href="{% static 'styles/style-login.css' %}">
+      <link rel="stylesheet" href="{% static 'styles/material-theme.css' %}">
       <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@48,400,0,0" />
       <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
       
       <!-- Enhanced LMS Theme Styles -->
       <style>
          :root {
-            --primary-color: #2563eb;
-            --primary-dark: #1d4ed8;
-            --secondary-color: #7c3aed;
+            --primary-color: #0b5ed7;
+            --primary-dark: #084298;
+            --secondary-color: #0ea5e9;
             --accent-color: #06b6d4;
             --success-color: #10b981;
             --warning-color: #f59e0b;
@@ -43,6 +41,7 @@
             --border-radius: 12px;
             --box-shadow: 0 10px 25px rgba(0,0,0,0.1);
             --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            --header-height: 64px;
          }
 
          * {
@@ -53,7 +52,7 @@
 
          body {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #0b5ed7 0%, #0ea5e9 100%);
             min-height: 100vh;
             position: relative;
             overflow-x: hidden;
@@ -68,11 +67,16 @@
             width: 100%;
             height: 100%;
             background: 
-               radial-gradient(circle at 20% 80%, rgba(120, 119, 198, 0.3) 0%, transparent 50%),
-               radial-gradient(circle at 80% 20%, rgba(255, 119, 198, 0.3) 0%, transparent 50%),
-               radial-gradient(circle at 40% 40%, rgba(120, 219, 255, 0.3) 0%, transparent 50%);
+               radial-gradient(circle at 20% 80%, rgba(11, 94, 215, 0.25) 0%, transparent 50%),
+               radial-gradient(circle at 80% 20%, rgba(14, 165, 233, 0.25) 0%, transparent 50%),
+               radial-gradient(circle at 40% 40%, rgba(6, 182, 212, 0.25) 0%, transparent 50%);
             animation: backgroundShift 20s ease-in-out infinite;
+            animation-play-state: paused;
             z-index: -1;
+         }
+
+         body.loaded::before {
+            animation-play-state: running;
          }
 
          @keyframes backgroundShift {
@@ -82,12 +86,42 @@
             75% { transform: translateX(-10px) translateY(20px); }
          }
 
+         /* Top Header */
+         .lms-header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: var(--header-height);
+            background: rgba(255,255,255,0.9);
+            backdrop-filter: blur(10px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            z-index: 1000;
+         }
+         .lms-header-inner {
+            max-width: 1200px;
+            margin: 0 auto;
+            height: 100%;
+            padding: 0 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+         }
+         .lms-brand {
+            display: inline-flex;
+            align-items: center;
+            text-decoration: none;
+         }
+         .lms-logo { width: 28px; height: 28px; margin-right: 10px; border-radius: 6px; }
+         .lms-title { font-weight: 700; font-size: 1.1rem; color: var(--dark-text); }
+         .lms-header-text { color: var(--muted-text); font-weight: 500; font-size: 0.95rem; }
+
          .main {
             min-height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 20px;
+            padding: calc(20px + var(--header-height)) 20px 20px;
             position: relative;
          }
 
@@ -103,7 +137,7 @@
             width: 100%;
             display: grid;
             grid-template-columns: 1fr 1fr;
-            grid-gap: 0;
+            gap: 24px;
             min-height: 650px;
             position: relative;
          }
@@ -168,7 +202,8 @@
          .lms-branding p {
             font-size: 0.9rem;
             opacity: 0.9;
-            text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+            text-shadow: 0 1px 2px rgba(232, 207, 207, 0.87);
+            color:white;
          }
 
          .signin-form {
@@ -176,6 +211,7 @@
             flex-direction: column;
             justify-content: center;
             background: rgba(255, 255, 255, 0.98);
+            padding: 40px 0 40px 0;
          }
 
          .form-title {
@@ -202,8 +238,52 @@
             position: relative;
             margin-bottom: 25px;
          }
-
-         .form-group label {
+         
+         /* Role Selection Styling - Enhanced Theme-Based Design */
+         .role-selection-group {
+            margin-bottom: 30px;
+            animation: slideInUp 0.6s ease-out 0.3s both;
+         }
+         
+         .role-label {
+            display: flex;
+            align-items: center;
+            margin-bottom: 12px;
+            color: var(--dark-text);
+            font-weight: 600;
+            font-size: 1rem;
+            letter-spacing: 0.3px;
+            position: static;
+            z-index: 1;
+            padding: 0;
+            margin-top: 0;
+            left: auto;
+            top: auto;
+            transform: none;
+            pointer-events: auto;
+         }
+         
+         .role-label-icon {
+            font-size: 20px;
+            margin-right: 8px;
+            color: var(--primary-color);
+            vertical-align: middle;
+         }
+         
+         .role-label-text {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+         }
+         
+         .role-select-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+         }
+         
+         .role-select-icon {
             position: absolute;
             left: 22px;
             top: 50%;
@@ -211,16 +291,176 @@
             color: var(--muted-text);
             font-size: 1.3rem;
             z-index: 2;
-            transition: var(--transition);
             pointer-events: none;
+            transition: var(--transition);
+         }
+         
+         .role-select-arrow {
+            position: absolute;
+            right: 22px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--muted-text);
+            font-size: 1.5rem;
+            z-index: 2;
+            pointer-events: none;
+            transition: var(--transition);
+         }
+         
+         #user_type_select {
+            width: 100%;
+            padding: 20px 60px 20px 60px;
+            border: 2px solid var(--border-color);
+            border-radius: var(--border-radius);
+            font-size: 1.1rem;
+            background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+            transition: var(--transition);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            color: var(--dark-text);
+            font-weight: 500;
+            cursor: pointer;
+            appearance: none;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            background-image: none;
+         }
+         
+         #user_type_select:hover {
+            border-color: var(--primary-color);
+            background: #ffffff;
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.15);
+            transform: translateY(-1px);
+         }
+         
+         .role-select-wrapper:hover .role-select-icon,
+         .role-select-wrapper:hover .role-select-arrow {
+            color: var(--primary-color);
+         }
+         
+         #user_type_select:focus {
+            border-color: var(--primary-color);
+            background: #ffffff;
+            box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.15), 0 4px 12px rgba(37, 99, 235, 0.2);
+            outline: none;
+            transform: translateY(-1px);
+         }
+         
+         .role-select-wrapper:focus-within .role-select-icon,
+         .role-select-wrapper:focus-within .role-select-arrow {
+            color: var(--primary-color);
+         }
+         
+         /* Role selection option styling */
+         #user_type_select option {
+            padding: 12px;
+            font-size: 1.1rem;
+            font-weight: 500;
+            color: var(--dark-text);
+            background: #ffffff;
+         }
+         
+         #user_type_select option:hover {
+            background: rgba(37, 99, 235, 0.1);
+         }
+         
+         /* Active state indicator */
+         .role-selection-group.active #user_type_select {
+            border-color: var(--primary-color);
+            background: linear-gradient(135deg, rgba(37, 99, 235, 0.05) 0%, #ffffff 100%);
+            box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
+         }
+         
+         .role-selection-group.active .role-select-icon {
+            color: var(--primary-color);
+         }
+         
+         .role-selection-group.active .role-select-arrow {
+            color: var(--primary-color);
+         }
+         
+         /* Enhanced visual feedback */
+         .role-label {
+            position: relative;
+         }
+         
+         .role-label::after {
+            content: '';
+            position: absolute;
+            bottom: -4px;
+            left: 0;
+            width: 0;
+            height: 2px;
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            transition: width 0.3s ease;
+         }
+         
+         .role-selection-group.active .role-label::after {
+            width: 100%;
+         }
+         
+         /* Subtle attention animation - only on initial load */
+         @keyframes subtle-glow {
+            0%, 100% {
+               border-color: var(--border-color);
+            }
+            50% {
+               border-color: rgba(37, 99, 235, 0.3);
+            }
+         }
+         
+         body.loaded .role-selection-group:not(.active):not(.interacted) #user_type_select {
+            animation: subtle-glow 3s ease-in-out 2;
+         }
+         
+         /* Responsive adjustments */
+         @media (max-width: 480px) {
+            .role-label {
+               font-size: 0.9rem;
+            }
+            
+            #user_type_select {
+               padding: 18px 55px 18px 55px;
+               font-size: 1rem;
+            }
+         }
+
+         /* Standard form labels (for username/password) - Position as icons inside inputs */
+         .form-group:not(.role-selection-group) label {
+            position: absolute;
+            left: 18px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--muted-text);
+            font-size: 1.3rem;
+            pointer-events: none;
+            z-index: 1;
+         }
+         
+         /* Role selection label is NOT absolute positioned - ensure it's visible */
+         .role-selection-group .role-label {
+            position: static !important;
+            display: flex !important;
+            align-items: center !important;
+            transform: none !important;
+            pointer-events: auto !important;
+            margin-bottom: 12px !important;
+            margin-top: 0 !important;
+            left: auto !important;
+            top: auto !important;
+         }
+         
+         /* Ensure role selection group has proper spacing */
+         .role-selection-group {
+            margin-top: 10px;
+            margin-bottom: 25px;
          }
 
          .form-control {
             width: 100%;
-            padding: 20px 20px 20px 60px;
+            padding: 16px 16px 16px 56px;
             border: 2px solid var(--border-color);
             border-radius: var(--border-radius);
-            font-size: 1.1rem;
+            font-size: 1.05rem;
             background: #ffffff;
             transition: var(--transition);
             box-shadow: none;
@@ -238,10 +478,6 @@
             background: #ffffff;
             box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
             outline: none;
-         }
-
-         .form-control:focus ~ label {
-            color: var(--primary-color);
          }
 
          .form-control:hover {
@@ -277,16 +513,15 @@
             transform: none;
          }
 
-         .guest-links {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+         /* Admin link container styling */
+         .admin-link-container {
+            text-align: center;
             margin-top: 30px;
             padding-top: 30px;
             border-top: 1px solid var(--border-color);
          }
-
-         .guest-links a {
+         
+         .admin-link-container a {
             color: var(--muted-text);
             text-decoration: none;
             font-weight: 500;
@@ -294,31 +529,13 @@
             padding: 10px 16px;
             border-radius: 8px;
             font-size: 0.9rem;
+            display: inline-flex;
+            align-items: center;
          }
-
-         .guest-links a:hover {
+         
+         .admin-link-container a:hover {
             color: var(--primary-color);
             background: rgba(37, 99, 235, 0.1);
-         }
-
-         .dropdown-menu {
-            border: none;
-            box-shadow: var(--box-shadow);
-            border-radius: var(--border-radius);
-            padding: 10px;
-            margin-top: 5px;
-         }
-
-         .dropdown-item {
-            border-radius: 8px;
-            padding: 12px 16px;
-            transition: var(--transition);
-            font-size: 0.9rem;
-         }
-
-         .dropdown-item:hover {
-            background: rgba(37, 99, 235, 0.1);
-            color: var(--primary-color);
          }
 
          .alert {
@@ -363,7 +580,7 @@
          @media (max-width: 768px) {
             .signin-content {
                grid-template-columns: 1fr;
-               max-width: 450px;
+               max-width: 700px;
                min-height: 500px;
             }
             
@@ -379,9 +596,9 @@
                font-size: 2.2rem;
             }
             
-            .guest-links {
-               flex-direction: column;
-               gap: 15px;
+            .admin-link-container {
+               margin-top: 20px;
+               padding-top: 20px;
             }
          }
 
@@ -455,8 +672,24 @@
             }
          }
       </style>
+      <style>
+         @media (prefers-reduced-motion: reduce) {
+            * { animation: none !important; transition: none !important; }
+         }
+      </style>
    </head>
    <body>
+      <header class="lms-header" role="banner">
+         <div class="lms-header-inner">
+            <a href="/" class="lms-brand" aria-label="eLMS Home">
+               <img src="{% static 'images/icon/favicon-32x32.png' %}" alt="eLMS" class="lms-logo" />
+               <span class="lms-title">eLMS</span>
+            </a>
+            <div class="lms-header-actions">
+               <span class="lms-header-text">Secure Login</span>
+            </div>
+         </div>
+      </header>
       <!-- Loading Overlay -->
       <div class="loading-overlay" id="loadingOverlay">
          <div class="loading-spinner"></div>
@@ -466,7 +699,7 @@
          <div class="signin-content">
             <!-- Left Side - Image with LMS Branding -->
             <div class="signin-image">
-               <div class="lms-branding">
+               <div class="lms-branding" aria-hidden="true">
                   <h3>📚 eLMS</h3>
                   <p>Learning Management System</p>
                </div>
@@ -481,7 +714,7 @@
             <!-- Right Side - Enhanced Form -->
             <div class="signin-form">
                <h2 class="form-title">Welcome Back</h2>
-               <p class="form-subtitle">Sign in to continue your learning journey</p>
+               <p class="form-subtitle">Use your registered eLMS credentials to login</p>
                
                {% if error_messages %}
                <!-- Error Alert -->
@@ -511,6 +744,19 @@
                      {{ form.password }}
                   </div>
                   
+                  <!-- Role Selection Dropdown - Enhanced UI -->
+                  <div class="form-group role-selection-group">
+                     <label for="{{ form.user_type.id_for_label }}" class="role-label">
+                        <span class="material-symbols-outlined role-label-icon">badge</span>
+                        <span class="role-label-text">Select Your Role</span>
+                     </label>
+                     <div class="role-select-wrapper">
+                        <span class="material-symbols-outlined role-select-icon">person</span>
+                        {{ form.user_type }}
+                        <span class="material-symbols-outlined role-select-arrow">keyboard_arrow_down</span>
+                     </div>
+                  </div>
+                  
                   <div class="form-group">
                      <button class="btn btn-lg btn-primary btn-login" type="submit" id="login-btn">
                         <span class="btn-text">Sign In</span>
@@ -529,32 +775,10 @@
                   </div>
                </form>
                
-               <div class="guest-links">
-                  <div class="dropdown">
-                     <a class="dropdown-toggle" id="dropdownMenuButton1" data-bs-toggle="dropdown" aria-expanded="false" role="button">
-                        <span class="material-symbols-outlined me-1" id="guest-icon" style="font-size: 18px;">person_add</span>
-                        <span id="guest-text">Guest Access</span>
-                        <!-- <span class="material-symbols-outlined ms-1" style="font-size: 16px;">keyboard_arrow_down</span> -->
-                     </a>
-                     <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton1">
-                        <li><a class="dropdown-item guest-option" href="/student" data-type="student" data-icon="school" data-text="Student">
-                           <span class="material-symbols-outlined me-2" style="font-size: 18px;">school</span>
-                           Student
-                        </a></li>
-                        <li><a class="dropdown-item guest-option" href="/teacher" data-type="teacher" data-icon="person" data-text="Teacher">
-                           <span class="material-symbols-outlined me-2" style="font-size: 18px;">person</span>
-                           Teacher
-                        </a></li>
-                        <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item guest-option" href="#" data-type="guest" data-icon="person_add" data-text="Guest Access">
-                           <span class="material-symbols-outlined me-2" style="font-size: 18px;">person_add</span>
-                           Reset to Guest
-                        </a></li>
-                     </ul>
-                  </div>
-                  
-                  <a href="/admin" target="_blank" class="btn btn-lg">
-                     <span class="material-symbols-outlined me-1" style="font-size: 18px;">admin_panel_settings</span>
+               <!-- Admin Panel Link Only -->
+               <div class="admin-link-container" style="text-align: center; margin-top: 30px; padding-top: 30px; border-top: 1px solid var(--border-color);">
+                  <a href="/admin" target="_blank" class="btn btn-lg" style="color: var(--muted-text); text-decoration: none; font-weight: 500; padding: 10px 16px; border-radius: 8px; font-size: 0.9rem; transition: var(--transition);">
+                     <span class="material-symbols-outlined me-1" style="font-size: 18px; vertical-align: middle;">admin_panel_settings</span>
                      Admin Panel
                   </a>
                </div>
@@ -562,7 +786,8 @@
          </div>
       </div>
       <script src="{% static 'js/bootstrap.bundle.min.js' %}"></script>
-      <script>
+      <script src="{% static 'js/ui.js' %}"></script>
+      <script nonce="{{ request.csp_nonce }}">
          // Enhanced LMS Login Functionality
          document.addEventListener('DOMContentLoaded', function() {
              const form = document.getElementById('login-form');
@@ -606,6 +831,41 @@
                  validateField(this);
              });
              
+             // Get role selection field
+             const userTypeField = document.getElementById('user_type_select');
+             const roleSelectionGroup = document.querySelector('.role-selection-group');
+             
+             // Add active state when role is selected
+             if (userTypeField) {
+                // Mark as interacted when user interacts with the field
+                userTypeField.addEventListener('focus', function() {
+                   roleSelectionGroup?.classList.add('interacted');
+                });
+                
+                userTypeField.addEventListener('change', function() {
+                   roleSelectionGroup?.classList.add('interacted');
+                   if (this.value) {
+                      roleSelectionGroup?.classList.add('active');
+                      // Animate arrow
+                      const arrow = document.querySelector('.role-select-arrow');
+                      if (arrow) {
+                         arrow.style.transform = 'translateY(-50%) rotate(180deg)';
+                         setTimeout(() => {
+                            arrow.style.transform = 'translateY(-50%) rotate(0deg)';
+                         }, 200);
+                      }
+                   } else {
+                      roleSelectionGroup?.classList.remove('active');
+                   }
+                });
+                
+                // Set active state on page load if value exists
+                if (userTypeField.value) {
+                   roleSelectionGroup?.classList.add('active');
+                   roleSelectionGroup?.classList.add('interacted');
+                }
+             }
+             
              // Enhanced form submission with loading state
              form.addEventListener('submit', function(e) {
                  let isValid = true;
@@ -621,6 +881,13 @@
                  if (!validateField(passwordField)) {
                      showError('Please enter your password');
                      passwordField.focus();
+                     isValid = false;
+                 }
+                 
+                 // Validate role selection
+                 if (userTypeField && !userTypeField.value) {
+                     showError('Please select your role (Student or Teacher)');
+                     userTypeField.focus();
                      isValid = false;
                  }
                  
@@ -732,133 +999,7 @@
                  }, 600);
              });
              
-             // Dynamic Guest Access Dropdown
-             const guestOptions = document.querySelectorAll('.guest-option');
-             const guestIcon = document.getElementById('guest-icon');
-             const guestText = document.getElementById('guest-text');
-             
-             // Load saved selection on page load
-             function loadSavedSelection() {
-                 const savedType = localStorage.getItem('selectedGuestType');
-                 const dropdownButton = document.getElementById('dropdownMenuButton1');
-                 
-                 if (savedType && savedType !== 'guest') {
-                     const savedOption = document.querySelector(`[data-type="${savedType}"]`);
-                     if (savedOption) {
-                         const icon = savedOption.getAttribute('data-icon');
-                         const text = savedOption.getAttribute('data-text');
-                         
-                         guestIcon.textContent = icon;
-                         guestText.textContent = text;
-                         
-                         // Add active state
-                         guestOptions.forEach(opt => opt.classList.remove('active'));
-                         savedOption.classList.add('active');
-                         
-                         // Add visual indicator
-                         dropdownButton.setAttribute('data-selected', 'true');
-                     }
-                 } else {
-                     // Reset visual state
-                     dropdownButton.setAttribute('data-selected', 'false');
-                 }
-             }
-             
-             // Save selection to localStorage
-             function saveSelection(type, icon, text) {
-                 localStorage.setItem('selectedGuestType', type);
-                 localStorage.setItem('selectedGuestIcon', icon);
-                 localStorage.setItem('selectedGuestText', text);
-             }
-             
-             // Initialize saved selection
-             loadSavedSelection();
-             
-             guestOptions.forEach(option => {
-                 option.addEventListener('click', function(e) {
-                     e.preventDefault(); // Prevent default navigation
-                     
-                     const type = this.getAttribute('data-type');
-                     const icon = this.getAttribute('data-icon');
-                     const text = this.getAttribute('data-text');
-                     
-                     const dropdownButton = document.getElementById('dropdownMenuButton1');
-                     
-                     if (type === 'guest') {
-                         // Reset to guest access
-                         guestIcon.textContent = 'person_add';
-                         guestText.textContent = 'Guest Access';
-                         
-                         // Remove any active states
-                         guestOptions.forEach(opt => opt.classList.remove('active'));
-                         
-                         // Clear saved selection
-                         localStorage.removeItem('selectedGuestType');
-                         localStorage.removeItem('selectedGuestIcon');
-                         localStorage.removeItem('selectedGuestText');
-                         
-                         // Reset visual state
-                         dropdownButton.setAttribute('data-selected', 'false');
-                         
-                         // Show success message
-                         showSuccess('Reset to Guest Access');
-                         return;
-                     }
-                     
-                     // Update the dropdown button
-                     guestIcon.textContent = icon;
-                     guestText.textContent = text;
-                     
-                     // Add active state to selected option
-                     guestOptions.forEach(opt => opt.classList.remove('active'));
-                     this.classList.add('active');
-                     
-                     // Save selection
-                     saveSelection(type, icon, text);
-                     
-                     // Add visual indicator
-                     dropdownButton.setAttribute('data-selected', 'true');
-                     
-                     // Show success message
-                     showSuccess(`${text} mode selected`);
-                     
-                     // Close the dropdown
-                     const dropdown = bootstrap.Dropdown.getInstance(dropdownButton);
-                     if (dropdown) {
-                         dropdown.hide();
-                     }
-                 });
-             });
-             
-             // Success message function
-             function showSuccess(message) {
-                 // Remove existing alerts
-                 const existingAlert = document.querySelector('.alert-success');
-                 if (existingAlert) {
-                     existingAlert.remove();
-                 }
-                 
-                 // Create success alert
-                 const alert = document.createElement('div');
-                 alert.className = 'alert alert-success alert-dismissible fade show';
-                 alert.innerHTML = `
-                     <strong>✅ ${message}</strong>
-                     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                 `;
-                 
-                 // Insert before form
-                 const form = document.getElementById('login-form');
-                 form.parentNode.insertBefore(alert, form);
-                 
-                 // Auto-dismiss after 3 seconds
-                 setTimeout(() => {
-                     if (alert.parentNode) {
-                         alert.remove();
-                     }
-                 }, 3000);
-             }
-             
-             // Add CSS for ripple effect and active states
+             // Add CSS for ripple effect
              const style = document.createElement('style');
              style.textContent = `
                  .btn-login {
@@ -882,34 +1023,17 @@
                      }
                  }
                  
-                 .guest-option.active {
-                     background: rgba(37, 99, 235, 0.1);
-                     color: var(--primary-color);
-                     font-weight: 600;
-                 }
-                 
-                 .alert-success {
-                     background: linear-gradient(135deg, #d1fae5, #a7f3d0);
-                     color: #065f46;
-                     border-left: 4px solid var(--success-color);
-                 }
-                 
-                 .dropdown-divider {
-                     margin: 8px 0;
-                     border-color: var(--border-color);
-                 }
-                 
-                 .dropdown-toggle[data-selected="true"] {
-                     background: rgba(37, 99, 235, 0.1);
-                     color: var(--primary-color);
-                     border: 2px solid var(--primary-color);
-                 }
-                 
-                 .dropdown-toggle[data-selected="true"]:hover {
-                     background: rgba(37, 99, 235, 0.15);
+                 .admin-link-container a:hover {
+                     color: var(--primary-color) !important;
+                     background: rgba(37, 99, 235, 0.1) !important;
                  }
              `;
              document.head.appendChild(style);
+             
+             // Add loaded class to body for animations
+             setTimeout(() => {
+                 document.body.classList.add('loaded');
+             }, 100);
          });
       </script>
    </body>
