@@ -1,13 +1,13 @@
 {% extends 'index.html' %}
 {% block title %}Change Email | eLMS{% endblock title %}
 {% block profile %}
-{% url 'profile' student.student_id %}
+{% if student %}{% url 'profile' student.student_id %}{% elif faculty %}{% url 'profile' faculty.faculty_id %}{% endif %}
 {% endblock %}
 {% block user %}
-{{student.name}}
+{% if student %}{{student.name}}{% elif faculty %}{{faculty.name}}{% endif %}
 {% endblock user %}
 {% block courses %}
-{% url 'myCourses' %}
+{% if student %}{% url 'myCourses' %}{% elif faculty %}{% url 'facultyCourses' %}{% endif %}
 {% endblock courses %}
 {% block allCourses %}
 {% url 'courses' %}
@@ -34,11 +34,17 @@
          
          <div class="mb-3">
             <p class="text-muted">Current Email: 
-               <strong>{% if student.email %}{{student.email}}{% else %}Not set{% endif %}</strong>
+               <strong>
+                  {% if student %}
+                     {% if student.email %}{{student.email}}{% else %}Not set{% endif %}
+                  {% elif faculty %}
+                     {% if faculty.email %}{{faculty.email}}{% else %}Not set{% endif %}
+                  {% endif %}
+               </strong>
             </p>
          </div>
          
-         <form action="{% url 'changeEmail' %}" method="post">
+         <form action="{% if student %}{% url 'changeEmail' %}{% elif faculty %}{% url 'changeEmailFaculty' %}{% endif %}" method="post">
             {% csrf_token %}
             <div class="mb-3">
                <label for="new_email" class="form-label">New Email Address <span class="text-danger">*</span></label>
@@ -53,7 +59,7 @@
                <button type="submit" class="btn btn-primary">Update Email</button>
             </div>
             <div class="text-center mt-3">
-               <a href="{% url 'profile' student.student_id %}">Cancel</a>
+               <a href="{% if student %}{% url 'profile' student.student_id %}{% elif faculty %}{% url 'profile' faculty.faculty_id %}{% endif %}">Cancel</a>
             </div>
          </form>
       </div>
