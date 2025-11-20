@@ -2,6 +2,7 @@ import datetime
 import logging
 from django.shortcuts import render, redirect, get_object_or_404
 from .models import Quiz, Question, StudentAnswer
+from .forms import QuestionForm
 from main.models import Student, Course, Faculty
 from main.views import is_faculty_authorised, is_student_authorised
 from django.contrib import messages
@@ -67,18 +68,14 @@ def addQuestion(request, code, quiz_id):
         if is_faculty_authorised(request, code):
             quiz = Quiz.objects.get(id=quiz_id)
             if request.method == 'POST':
-                question = request.POST.get('question')
-                option1 = request.POST.get('option1')
-                option2 = request.POST.get('option2')
-                option3 = request.POST.get('option3')
-                option4 = request.POST.get('option4')
-                answer = request.POST.get('answer')
-                marks = request.POST.get('marks')
-                explanation = request.POST.get('explanation')
-                question = Question(question=question, option1=option1, option2=option2,
-                                    option3=option3, option4=option4, answer=answer, quiz=quiz, marks=marks, explanation=explanation)
-                question.save()
-                messages.success(request, 'Question added successfully')
+                form = QuestionForm(request.POST)
+                if form.is_valid():
+                    obj = form.save(commit=False)
+                    obj.quiz = quiz
+                    obj.save()
+                    messages.success(request, 'Question added successfully')
+                else:
+                    return render(request, 'quiz/addQuestion.html', {'course': course, 'quiz': quiz, 'faculty': Faculty.objects.get(faculty_id=request.session['faculty_id'])})
             else:
                 return render(request, 'quiz/addQuestion.html', {'course': course, 'quiz': quiz, 'faculty': Faculty.objects.get(faculty_id=request.session['faculty_id'])})
             if 'saveOnly' in request.POST:
