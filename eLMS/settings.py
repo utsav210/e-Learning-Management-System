@@ -231,16 +231,22 @@ CSP_OBJECT_SRC = ("'none'",)
 
 # HTTPS settings - only enforce in production
 if not DEBUG:
-    SECURE_HSTS_SECONDS = 31536000
+    # Production: Enforce HTTPS strictly
+    SECURE_HSTS_SECONDS = 31536000  # 1 year
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
     SECURE_SSL_REDIRECT = True
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
 else:
-    # In development, allow HTTP but still use secure cookies when possible
-    SESSION_COOKIE_SECURE = False
-    CSRF_COOKIE_SECURE = False
+    # Development: Allow HTTP but prepare for HTTPS
+    # HSTS disabled in development to allow HTTP testing
+    SECURE_HSTS_SECONDS = 0
+    SECURE_SSL_REDIRECT = False
+    # Secure cookies enabled - will work on HTTPS, ignored on HTTP in dev
+    # This prevents warnings while maintaining compatibility
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
     
 # Additional security
 SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
