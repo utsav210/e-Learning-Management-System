@@ -24,13 +24,54 @@ load_dotenv(BASE_DIR / '.env')
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.0/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-_@876m&g2$*55!90p5cvqfsb)_f07n#33vhp2^3ggabcx#zyjr')
-
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get('DEBUG', 'True').lower() == 'true'
+# SECURITY FIX: For development convenience, default to True if not set (with warning)
+# In production, explicitly set DEBUG=False in environment variables
+DEBUG_ENV = os.environ.get('DEBUG', '').lower()
+if DEBUG_ENV == '':
+    # DEBUG not set - default to True for development convenience, but warn
+    DEBUG = True
+    import warnings
+    warnings.warn(
+        "DEBUG not explicitly set in environment. Defaulting to True for development. "
+        "Set DEBUG=False in environment variables for production deployment!",
+        UserWarning
+    )
+else:
+    DEBUG = DEBUG_ENV == 'true'
 
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '*').split(',')
+# SECURITY WARNING: keep the secret key used in production secret!
+# SECURITY FIX: SECRET_KEY must be set in environment for production
+# For development convenience, a temporary key is generated if not set (only when DEBUG=True)
+SECRET_KEY = os.environ.get('SECRET_KEY')
+if not SECRET_KEY:
+    if DEBUG:
+        # Development fallback - generate a random key for this session only
+        # WARNING: This is NOT secure for production!
+        import secrets
+        import string
+        SECRET_KEY = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(50))
+        import warnings
+        warnings.warn(
+            "SECRET_KEY not set in environment. Using auto-generated key for development only. "
+            "Set SECRET_KEY environment variable for production deployment!",
+            UserWarning
+        )
+    else:
+        # Production mode - SECRET_KEY is required
+        raise ValueError(
+            "SECRET_KEY environment variable must be set for security in production. "
+            "Do not use default values in production."
+        )
+
+# SECURITY FIX: Default to empty list, explicitly set ALLOWED_HOSTS in environment
+# Never use '*' in production as it allows host header injection attacks
+allowed_hosts_env = os.environ.get('ALLOWED_HOSTS', '')
+if allowed_hosts_env:
+    ALLOWED_HOSTS = [host.strip() for host in allowed_hosts_env.split(',') if host.strip()]
+else:
+    # In development, allow localhost if DEBUG is True
+    ALLOWED_HOSTS = ['localhost', '127.0.0.1'] if DEBUG else []
 
 
 # Application definition
@@ -48,6 +89,7 @@ INSTALLED_APPS = [
     'quiz.apps.QuizConfig',
     'django_cleanup.apps.CleanupConfig',
     'froala_editor',
+    'widget_tweaks',
 ]
 
 MIDDLEWARE = [
@@ -58,6 +100,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'eLMS.middleware.ContentSecurityPolicyMiddleware',
 ]
 
 
@@ -138,7 +181,7 @@ PASSWORD_HASHERS = [
 
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'Asia/Dhaka'
+TIME_ZONE = 'Asia/Kolkata'
 
 USE_I18N = True
 USE_TZ = False
@@ -147,7 +190,9 @@ USE_TZ = False
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.0/howto/static-files/
 
-SESSION_ENGINE = 'django.contrib.sessions.backends.signed_cookies'
+# SECURITY FIX: Changed from signed cookies to database-backed sessions for better security
+# Database sessions provide better security, larger storage capacity, and easier management
+SESSION_ENGINE = 'django.contrib.sessions.backends.db'
 
 STATIC_URL = '/static/'
 
@@ -167,23 +212,39 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 SESSION_EXPIRE_AT_BROWSER_CLOSE = True
 
 # Security Settings
+# SECURITY FIX: Apply security headers in all environments (not just production)
+# Security headers should be enabled even in development for consistency
+SECURE_BROWSER_XSS_FILTER = True
+SECURE_CONTENT_TYPE_NOSNIFF = True
+X_FRAME_OPTIONS = 'DENY'
+
+# Content Security Policy
+CSP_DEFAULT_SRC = ("'self'",)
+CSP_SCRIPT_SRC = ("'self'", 'https://fonts.googleapis.com', 'https://cdn.tailwindcss.com')
+CSP_STYLE_SRC = ("'self'", 'https://fonts.googleapis.com', "'unsafe-inline'")
+CSP_IMG_SRC = ("'self'", 'data:')
+CSP_FONT_SRC = ("'self'", 'https://fonts.gstatic.com', 'data:')
+CSP_CONNECT_SRC = ("'self'",)
+CSP_FRAME_SRC = ("'none'",)
+CSP_MEDIA_SRC = ("'self'",)
+CSP_OBJECT_SRC = ("'none'",)
+
+# HTTPS settings - only enforce in production
 if not DEBUG:
-    # Security headers
-    SECURE_BROWSER_XSS_FILTER = True
-    SECURE_CONTENT_TYPE_NOSNIFF = True
-    X_FRAME_OPTIONS = 'DENY'
     SECURE_HSTS_SECONDS = 31536000
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
-    
-    # HTTPS settings
     SECURE_SSL_REDIRECT = True
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
+else:
+    # In development, allow HTTP but still use secure cookies when possible
+    SESSION_COOKIE_SECURE = False
+    CSRF_COOKIE_SECURE = False
     
-    # Additional security
-    SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
-    SECURE_CROSS_ORIGIN_OPENER_POLICY = 'same-origin'
+# Additional security
+SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
+SECURE_CROSS_ORIGIN_OPENER_POLICY = 'same-origin'
 
 # Session security
 SESSION_COOKIE_HTTPONLY = True
