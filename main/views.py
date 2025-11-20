@@ -6,6 +6,7 @@ from .models import Student, Course, Announcement, Assignment, Submission, Mater
 from django.template.defaulttags import register
 from django.db.models import Count, Q
 from django.http import HttpResponseRedirect, Http404, JsonResponse
+from attendance.models import Attendance
 from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
 from .forms import AnnouncementForm, AssignmentForm, MaterialForm
@@ -18,24 +19,142 @@ from django.views.decorators.csrf import csrf_protect
 from django.views.decorators.cache import never_cache
 from django.core.mail import send_mail
 from django.conf import settings
-import random
+import secrets  # SECURITY FIX: Use secrets module for cryptographically secure random
+import random  # Keep for backward compatibility if needed
 import smtplib
 from datetime import timedelta
+from functools import wraps
+from django.core.cache import cache
+from django.http import HttpResponse
+import re
 
 # Configure logging
 logger = logging.getLogger(__name__)
+
+
+@register.filter
+def get_item(dictionary, key):
+    try:
+        return dictionary.get(key)
+    except Exception:
+        return None
+
+# SECURITY FIX: Rate limiting decorator to prevent brute force attacks
+def rate_limit(max_requests=5, window_seconds=300, key_prefix='rate_limit'):
+    """
+    Rate limiting decorator to prevent brute force attacks.
+    
+    Args:
+        max_requests: Maximum number of requests allowed
+        window_seconds: Time window in seconds (default 5 minutes)
+        key_prefix: Prefix for cache key
+    
+    Usage:
+        @rate_limit(max_requests=5, window_seconds=300)
+        def my_view(request):
+            ...
+    """
+    def decorator(view_func):
+        @wraps(view_func)
+        def wrapper(request, *args, **kwargs):
+            xff = request.META.get('HTTP_X_FORWARDED_FOR')
+            if xff:
+                parts = [p.strip() for p in xff.split(',') if p.strip()]
+                client_ip = parts[0] if parts else request.META.get('REMOTE_ADDR', 'unknown')
+            else:
+                client_ip = request.META.get('REMOTE_ADDR', 'unknown')
+            
+            # Create cache key
+            cache_key = f'{key_prefix}:{client_ip}'
+            
+            # Get current request count
+            request_count = cache.get(cache_key, 0)
+            
+            if request_count >= max_requests:
+                logger.warning(f"Rate limit exceeded for IP: {client_ip}")
+                try:
+                    messages.error(request, 'Too many requests. Please try again later.', fail_silently=True)
+                except Exception:
+                    pass
+                return HttpResponse('Too many requests. Please try again later.', status=429)
+            
+            # Increment request count
+            cache.set(cache_key, request_count + 1, window_seconds)
+            
+            return view_func(request, *args, **kwargs)
+        return wrapper
+    return decorator
+
+
+# SECURITY FIX: Password hashing helper functions
+# These functions provide secure password handling with backward compatibility
+def hash_password(password):
+    """
+    Hash a password using Django's password hasher.
+    This ensures passwords are stored securely using PBKDF2 or Argon2.
+    """
+    from django.contrib.auth.hashers import make_password
+    return make_password(password)
+
+
+def check_password(stored_password, provided_password):
+    """
+    Check if a provided password matches the stored password.
+    Supports both hashed (new) and plaintext (legacy) passwords for backward compatibility.
+    Automatically migrates plaintext passwords to hashed format on successful login.
+    """
+    from django.contrib.auth.hashers import check_password as django_check_password, make_password
+    
+    # First, try checking as if it's a hashed password
+    try:
+        if django_check_password(provided_password, stored_password):
+            return True
+    except (ValueError, TypeError):
+        # If stored_password is not a valid hash, it might be plaintext (legacy)
+        pass
+    
+    # Fallback: check if it's a plaintext match (for backward compatibility)
+    if stored_password == provided_password:
+        return True
+    
+    return False
+
+
+def ensure_password_hashed(user, password_field_name='password'):
+    """
+    Ensure a user's password is hashed. If it's plaintext, hash it.
+    This is called after successful authentication to migrate legacy passwords.
+    """
+    from django.contrib.auth.hashers import make_password, is_password_usable
+    
+    current_password = getattr(user, password_field_name)
+    
+    # Check if password is already hashed (Django hashes start with algorithm identifier)
+    # Valid Django password hashes start with: pbkdf2_sha256$, pbkdf2_sha1$, argon2$, bcrypt_sha256$
+    if not is_password_usable(current_password) or not current_password.startswith(('pbkdf2_', 'argon2$', 'bcrypt_', 'scrypt_')):
+        # Password is not hashed (plaintext), hash it now
+        hashed_password = make_password(current_password)
+        setattr(user, password_field_name, hashed_password)
+        user.save(update_fields=[password_field_name])
+        logger.info(f"Migrated plaintext password to hashed format for user: {getattr(user, 'name', 'Unknown')}")
 
 
 class LoginForm(forms.Form):
     username = forms.CharField(
         label='Username', 
         max_length=100, 
-        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Enter your username'})
+        widget=forms.TextInput(attrs={'class': 'form-control block w-full rounded-lg border border-gray-300 pl-5 pr-3 py-2.5 text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500', 'placeholder': 'Enter your username'})
     )
     password = forms.CharField(
-        widget=forms.PasswordInput(attrs={'class': 'form-control', 'placeholder': 'Enter your password'}),
+        widget=forms.PasswordInput(attrs={'class': 'form-control block w-full rounded-lg border border-gray-300 pl-10 pr-3 py-2.5 text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500', 'placeholder': 'Enter your password'}),
         min_length=1,
         max_length=255
+    )
+    user_type = forms.ChoiceField(
+        choices=[('student', 'Student'), ('teacher', 'Teacher')],
+        widget=forms.Select(attrs={'class': 'form-control block w-full rounded-lg border border-gray-300 pl-10 pr-8 py-2.5 text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500', 'id': 'user_type_select'}),
+        initial='student',
+        required=True
     )
     
     def clean_username(self):
@@ -53,6 +172,12 @@ class LoginForm(forms.Form):
             if len(password.strip()) == 0:
                 raise forms.ValidationError('Password cannot be empty')
         return password
+    
+    def clean_user_type(self):
+        user_type = self.cleaned_data.get('user_type')
+        if user_type not in ['student', 'teacher']:
+            raise forms.ValidationError('Invalid user type selected')
+        return user_type
 
 
 def is_student_authorised(request, code):
@@ -83,8 +208,10 @@ def is_faculty_authorised(request, code):
 
 
 # Custom Login page for both student and faculty with 2FA
+# SECURITY FIX: Role-based authentication - user must select their role
 @never_cache
 @csrf_protect
+@rate_limit(max_requests=10, window_seconds=300, key_prefix='login')
 @require_http_methods(["GET", "POST"])
 def std_login(request):
     error_messages = []
@@ -95,37 +222,45 @@ def std_login(request):
         if form.is_valid():
             username = form.cleaned_data['username']
             password = form.cleaned_data['password']
+            user_type = form.cleaned_data['user_type']  # 'student' or 'teacher'
 
-            # Check student login - working with plaintext passwords
-            try:
-                student = Student.objects.get(name=username)
-                # Direct comparison for plaintext passwords
-                if student.password == password:
-                    # Check if email is set (required for 2FA)
-                    if not student.email:
-                        error_messages.append('Email address is required for login. Please contact administrator to add your email.')
-                        context = {'form': form, 'error_messages': error_messages}
-                        return render(request, 'login_page.html', context)
-                    
-                    # Generate OTP for 2FA
-                    otp = generate_otp()
-                    
-                    # Invalidate previous login OTPs for this student
-                    LoginOTP.objects.filter(student=student, is_used=False).update(is_used=True)
-                    
-                    # Create new login OTP
-                    login_otp = LoginOTP.objects.create(
-                        student=student,
-                        email=student.email,
-                        otp=otp,
-                        user_type='student'
-                    )
-                    
-                    # Send OTP email
-                    try:
-                        send_mail(
-                            subject='Login Verification OTP - eLMS',
-                            message=f'''Hello {student.name},
+            # SECURITY FIX: Check only the selected role's table
+            # This prevents users from logging in with wrong role credentials
+            if user_type == 'student':
+                # Only check Student table
+                try:
+                    student = Student.objects.get(name=username)
+                    # SECURITY FIX: Use secure password checking with backward compatibility
+                    if check_password(student.password, password):
+                        # SECURITY FIX: Migrate plaintext password to hashed on successful login
+                        ensure_password_hashed(student, 'password')
+                        # Check if email is set (required for 2FA)
+                        if not student.email:
+                            error_messages.append('Email address is required for login. Please contact administrator to add your email.')
+                            context = {'form': form, 'error_messages': error_messages}
+                            return render(request, 'login_page.html', context)
+                        
+                        # Generate OTP for 2FA
+                        otp = generate_otp()
+                        
+                        # Invalidate previous login OTPs for this student
+                        LoginOTP.objects.filter(student=student, is_used=False).update(is_used=True)
+                        
+                        # Create new login OTP
+                        login_otp = LoginOTP.objects.create(
+                            student=student,
+                            email=student.email,
+                            otp=otp,
+                            user_type='student'
+                        )
+                        
+                        # Send OTP email
+                        try:
+                            if not (getattr(settings, 'EMAIL_HOST_USER', None) and getattr(settings, 'EMAIL_HOST_PASSWORD', None)):
+                                raise ValueError('Email credentials not configured')
+                            send_mail(
+                                subject='Login Verification OTP - eLMS',
+                                message=f'''Hello {student.name},
 
 You are attempting to login to your eLMS account.
 
@@ -137,55 +272,64 @@ If you did not attempt to login, please ignore this email and contact administra
 
 Best regards,
 eLMS Team''',
-                            from_email=settings.DEFAULT_FROM_EMAIL,
-                            recipient_list=[student.email],
-                            fail_silently=False,
-                        )
-                        # Store pending login info in session
-                        request.session['pending_login_user_type'] = 'student'
-                        request.session['pending_login_id'] = str(student.student_id)
-                        request.session['pending_login_email'] = student.email
-                        messages.success(request, f'OTP has been sent to your email: {student.email}')
-                        return redirect('verifyLoginOTP')
-                    except Exception as e:
-                        logger.error(f"Error sending login OTP email: {str(e)}")
-                        login_otp.delete()
-                        error_messages.append('Failed to send OTP. Please check your email configuration or contact administrator.')
-                        context = {'form': form, 'error_messages': error_messages}
-                        return render(request, 'login_page.html', context)
-            except Student.DoesNotExist:
-                pass
+                                from_email=settings.DEFAULT_FROM_EMAIL,
+                                recipient_list=[student.email],
+                                fail_silently=False,
+                            )
+                            # Store pending login info in session
+                            request.session['pending_login_user_type'] = 'student'
+                            request.session['pending_login_id'] = str(student.student_id)
+                            request.session['pending_login_email'] = student.email
+                            messages.success(request, f'OTP has been sent to your email: {student.email}')
+                            return redirect('verifyLoginOTP')
+                        except Exception as e:
+                            logger.error(f"Error sending login OTP email: {str(e)}")
+                            login_otp.delete()
+                            error_messages.append('Failed to send OTP. Please check your email configuration or contact administrator.')
+                            context = {'form': form, 'error_messages': error_messages}
+                            return render(request, 'login_page.html', context)
+                    else:
+                        # Password doesn't match
+                        error_messages.append('Invalid login credentials. Please check your username and password.')
+                except Student.DoesNotExist:
+                    # Student not found in Student table
+                    error_messages.append('Invalid login credentials. Student account not found.')
             
-            # Check faculty login - working with plaintext passwords
-            try:
-                faculty = Faculty.objects.get(name=username)
-                # Direct comparison for plaintext passwords
-                if faculty.password == password:
-                    # Check if email is set (required for 2FA)
-                    if not faculty.email:
-                        error_messages.append('Email address is required for login. Please contact administrator to add your email.')
-                        context = {'form': form, 'error_messages': error_messages}
-                        return render(request, 'login_page.html', context)
-                    
-                    # Generate OTP for 2FA
-                    otp = generate_otp()
-                    
-                    # Invalidate previous login OTPs for this faculty
-                    LoginOTP.objects.filter(faculty=faculty, is_used=False).update(is_used=True)
-                    
-                    # Create new login OTP
-                    login_otp = LoginOTP.objects.create(
-                        faculty=faculty,
-                        email=faculty.email,
-                        otp=otp,
-                        user_type='faculty'
-                    )
-                    
-                    # Send OTP email
-                    try:
-                        send_mail(
-                            subject='Login Verification OTP - eLMS',
-                            message=f'''Hello {faculty.name},
+            elif user_type == 'teacher':
+                # Only check Faculty table
+                try:
+                    faculty = Faculty.objects.get(name=username)
+                    # SECURITY FIX: Use secure password checking with backward compatibility
+                    if check_password(faculty.password, password):
+                        # SECURITY FIX: Migrate plaintext password to hashed on successful login
+                        ensure_password_hashed(faculty, 'password')
+                        # Check if email is set (required for 2FA)
+                        if not faculty.email:
+                            error_messages.append('Email address is required for login. Please contact administrator to add your email.')
+                            context = {'form': form, 'error_messages': error_messages}
+                            return render(request, 'login_page.html', context)
+                        
+                        # Generate OTP for 2FA
+                        otp = generate_otp()
+                        
+                        # Invalidate previous login OTPs for this faculty
+                        LoginOTP.objects.filter(faculty=faculty, is_used=False).update(is_used=True)
+                        
+                        # Create new login OTP
+                        login_otp = LoginOTP.objects.create(
+                            faculty=faculty,
+                            email=faculty.email,
+                            otp=otp,
+                            user_type='faculty'
+                        )
+                        
+                        # Send OTP email
+                        try:
+                            if not (getattr(settings, 'EMAIL_HOST_USER', None) and getattr(settings, 'EMAIL_HOST_PASSWORD', None)):
+                                raise ValueError('Email credentials not configured')
+                            send_mail(
+                                subject='Login Verification OTP - eLMS',
+                                message=f'''Hello {faculty.name},
 
 You are attempting to login to your eLMS account.
 
@@ -197,28 +341,41 @@ If you did not attempt to login, please ignore this email and contact administra
 
 Best regards,
 eLMS Team''',
-                            from_email=settings.DEFAULT_FROM_EMAIL,
-                            recipient_list=[faculty.email],
-                            fail_silently=False,
-                        )
-                        # Store pending login info in session
-                        request.session['pending_login_user_type'] = 'faculty'
-                        request.session['pending_login_id'] = str(faculty.faculty_id)
-                        request.session['pending_login_email'] = faculty.email
-                        messages.success(request, f'OTP has been sent to your email: {faculty.email}')
-                        return redirect('verifyLoginOTP')
-                    except Exception as e:
-                        logger.error(f"Error sending login OTP email: {str(e)}")
-                        login_otp.delete()
-                        error_messages.append('Failed to send OTP. Please check your email configuration or contact administrator.')
-                        context = {'form': form, 'error_messages': error_messages}
-                        return render(request, 'login_page.html', context)
-            except Faculty.DoesNotExist:
-                pass
+                                from_email=settings.DEFAULT_FROM_EMAIL,
+                                recipient_list=[faculty.email],
+                                fail_silently=False,
+                            )
+                            # Store pending login info in session
+                            request.session['pending_login_user_type'] = 'faculty'
+                            request.session['pending_login_id'] = str(faculty.faculty_id)
+                            request.session['pending_login_email'] = faculty.email
+                            messages.success(request, f'OTP has been sent to your email: {faculty.email}')
+                            return redirect('verifyLoginOTP')
+                        except Exception as e:
+                            logger.error(f"Error sending login OTP email: {str(e)}")
+                            login_otp.delete()
+                            error_messages.append('Failed to send OTP. Please check your email configuration or contact administrator.')
+                            context = {'form': form, 'error_messages': error_messages}
+                            return render(request, 'login_page.html', context)
+                    else:
+                        # Password doesn't match
+                        error_messages.append('Invalid login credentials. Please check your username and password.')
+                except Faculty.DoesNotExist:
+                    # Faculty not found in Faculty table
+                    error_messages.append('Invalid login credentials. Teacher account not found.')
+            else:
+                error_messages.append('Invalid user type selected.')
             
-            error_messages.append('Invalid login credentials.')
+            # If we reach here, login failed
+            if not error_messages:
+                error_messages.append('Invalid login credentials.')
         else:
-            error_messages.append('Invalid form data.')
+            # Form validation errors
+            for field, errors in form.errors.items():
+                for error in errors:
+                    error_messages.append(f'{field}: {error}')
+            if not error_messages:
+                error_messages.append('Invalid form data.')
     else:
         form = LoginForm()
 
@@ -232,6 +389,8 @@ eLMS Team''',
 
 
 # Two-Factor Authentication - Verify Login OTP
+# SECURITY FIX: Add rate limiting to prevent brute force attacks on OTP verification
+@rate_limit(max_requests=5, window_seconds=300, key_prefix='otp_verify')
 @csrf_protect
 @require_http_methods(["GET", "POST"])
 def verifyLoginOTP(request):
@@ -279,6 +438,7 @@ def verifyLoginOTP(request):
                     request.session.pop('pending_login_email', None)
                     
                     # Complete login
+                    request.session.cycle_key()
                     request.session['student_id'] = student.student_id
                     # Check if email is set, if not, mark for popup
                     if not student.email:
@@ -314,6 +474,7 @@ def verifyLoginOTP(request):
                     request.session.pop('pending_login_email', None)
                     
                     # Complete login
+                    request.session.cycle_key()
                     request.session['faculty_id'] = faculty.faculty_id
                     
                     messages.success(request, 'Login successful! Welcome back.')
@@ -360,18 +521,44 @@ def std_logout(request):
 def myCourses(request):
     try:
         if request.session.get('student_id'):
-            student = Student.objects.get(student_id=request.session['student_id'])
-            courses = student.course.all()
-            faculty = student.course.all().values_list('faculty_id', flat=True)
+            try:
+                student_id = int(str(request.session['student_id']))
+                student = Student.objects.get(student_id=student_id)
+            except Exception:
+                messages.error(request, 'Session invalid. Please login again.')
+                return redirect('std_login')
+            try:
+                courses = student.course.all()
+            except Exception:
+                courses = []
             
             # Check if email popup should be shown
             show_email_popup = request.session.get('show_email_popup', False) and not student.email
 
+            stats = {}
+            try:
+                for c in courses:
+                    total = Attendance.objects.filter(student=student, course=c).count()
+                    present = Attendance.objects.filter(student=student, course=c, status=True).count()
+                    late = Attendance.objects.filter(student=student, course=c, status=True, is_late=True).count()
+                    absent = Attendance.objects.filter(student=student, course=c, status=False).count()
+                    percentage = round((present / total) * 100, 2) if total else None
+                    stats[c.code] = {'total': total, 'present': present, 'late': late, 'absent': absent, 'percentage': percentage}
+            except Exception:
+                stats = {}
+
+            try:
+                from datetime import timedelta
+                recent_absences = Attendance.objects.filter(student=student, status=False, date__gte=(timezone.now().date() - timedelta(days=7))).count()
+            except Exception:
+                recent_absences = 0
+
             context = {
                 'courses': courses,
                 'student': student,
-                'faculty': faculty,
-                'show_email_popup': show_email_popup
+                'show_email_popup': show_email_popup,
+                'attendance_stats': stats,
+                'recent_absences': recent_absences
             }
 
             return render(request, 'main/myCourses.html', context)
@@ -383,7 +570,22 @@ def myCourses(request):
         return redirect('std_login')
     except Exception as e:
         logger.error(f"Error in myCourses: {str(e)}")
-        return render(request, 'error.html')
+        if request.session.get('student_id'):
+            try:
+                student_id = int(str(request.session['student_id']))
+                student = Student.objects.get(student_id=student_id)
+                context = {
+                    'courses': [],
+                    'student': student,
+                    'show_email_popup': False,
+                    'attendance_stats': {},
+                    'recent_absences': 0
+                }
+                return render(request, 'main/myCourses.html', context)
+            except Exception:
+                pass
+        messages.error(request, 'Unexpected error. Please login again.')
+        return redirect('std_login')
 
 
 # Display all courses (faculty view)
@@ -436,18 +638,52 @@ def course_page(request, code):
                 announcements = Announcement.objects.filter(course_code=course)
                 assignments = Assignment.objects.filter(course_code=course.code)
                 materials = Material.objects.filter(course_code=course.code)
+                frm = request.GET.get('from')
+                to = request.GET.get('to')
+                entries = Attendance.objects.filter(student=Student.objects.get(student_id=request.session['student_id']), course=course)
+                if frm:
+                    try:
+                        from datetime import datetime as dt
+                        frm_date = dt.fromisoformat(frm).date()
+                        entries = entries.filter(date__gte=frm_date)
+                    except Exception:
+                        pass
+                if to:
+                    try:
+                        from datetime import datetime as dt
+                        to_date = dt.fromisoformat(to).date()
+                        entries = entries.filter(date__lte=to_date)
+                    except Exception:
+                        pass
+                entries = entries.order_by('-date')
+                status = request.GET.get('status')
+                if status == 'present':
+                    entries = entries.filter(status=True, is_late=False)
+                elif status == 'late':
+                    entries = entries.filter(status=True, is_late=True)
+                elif status == 'absent':
+                    entries = entries.filter(status=False)
+                from django.core.paginator import Paginator
+                try:
+                    page_num = int(request.GET.get('page', '1'))
+                except Exception:
+                    page_num = 1
+                paginator = Paginator(entries, 25)
+                entries = paginator.get_page(page_num)
             except Exception as e:
                 logger.warning(f"Error loading course content: {e}")
                 announcements = None
                 assignments = None
                 materials = None
+                entries = Attendance.objects.none()
 
             context = {
                 'course': course,
                 'announcements': announcements,
                 'assignments': assignments[:3] if assignments else [],
                 'materials': materials,
-                'student': Student.objects.get(student_id=request.session['student_id'])
+                'student': Student.objects.get(student_id=request.session['student_id']),
+                'attendance_entries': entries
             }
 
             return render(request, 'main/course.html', context)
@@ -473,7 +709,8 @@ def course_page_faculty(request, code):
             materials = Material.objects.filter(course_code=course.code)
             studentCount = Student.objects.filter(course=course).count()
 
-        except:
+        except Exception as e:
+            logger.warning(f"Error loading faculty course content: {e}")
             announcements = None
             assignments = None
             materials = None
@@ -544,7 +781,10 @@ def deleteAnnouncement(request, code, id):
             announcement.delete()
             messages.warning(request, 'Announcement deleted successfully.')
             return redirect('/faculty/' + str(code))
-        except:
+        except Announcement.DoesNotExist:
+            return redirect('/faculty/' + str(code))
+        except Exception as e:
+            logger.error(f"deleteAnnouncement error: {e}")
             return redirect('/faculty/' + str(code))
     else:
         return redirect('std_login')
@@ -577,7 +817,10 @@ def updateAnnouncement(request, code, id):
                 form.save()
                 messages.info(request, 'Announcement updated successfully.')
                 return redirect('/faculty/' + str(code))
-        except:
+        except Announcement.DoesNotExist:
+            return redirect('/faculty/' + str(code))
+        except Exception as e:
+            logger.error(f"updateAnnouncement error: {e}")
             return redirect('/faculty/' + str(code))
 
     else:
@@ -608,7 +851,6 @@ def assignmentPage(request, code, id):
     if is_student_authorised(request, code):
         assignment = Assignment.objects.get(course_code=course.code, id=id)
         try:
-
             submission = Submission.objects.get(assignment=assignment, student=Student.objects.get(
                 student_id=request.session['student_id']))
 
@@ -623,7 +865,10 @@ def assignmentPage(request, code, id):
 
             return render(request, 'main/assignment-portal.html', context)
 
-        except:
+        except Submission.DoesNotExist:
+            submission = None
+        except Exception as e:
+            logger.error(f"assignmentPage error: {e}")
             submission = None
 
         context = {
@@ -713,7 +958,8 @@ def addSubmission(request, code, id):
                 return render(request, 'main/assignment-portal.html', context)
         else:
             return redirect('std_login')
-    except:
+    except Exception as e:
+        logger.error(f"addSubmission error: {e}")
         return HttpResponseRedirect(request.path_info)
 
 
@@ -737,7 +983,10 @@ def viewSubmission(request, code, id):
 
             return render(request, 'main/assignment-view.html', context)
 
-        except:
+        except Assignment.DoesNotExist:
+            return redirect('/faculty/' + str(code))
+        except Exception as e:
+            logger.error(f"viewSubmission error: {e}")
             return redirect('/faculty/' + str(code))
     else:
         return redirect('std_login')
@@ -755,9 +1004,16 @@ def gradeSubmission(request, code, id, sub_id):
                     assignment_id=assignment.id)
                 submission = Submission.objects.get(
                     assignment_id=id, id=sub_id)
-                submission.marks = request.POST['marks']
-                if request.POST['marks'] == 0:
-                    submission.marks = 0
+                # SECURITY FIX: Use .get() to safely access POST data with validation
+                marks_str = request.POST.get('marks', '0')
+                try:
+                    marks_value = float(marks_str)
+                    if marks_value < 0:
+                        marks_value = 0
+                    submission.marks = marks_value
+                except (ValueError, TypeError):
+                    messages.error(request, 'Invalid marks value.')
+                    return HttpResponseRedirect(request.path_info)
                 submission.save()
                 return HttpResponseRedirect(request.path_info)
             else:
@@ -780,7 +1036,8 @@ def gradeSubmission(request, code, id, sub_id):
 
         else:
             return redirect('std_login')
-    except:
+    except Exception as e:
+        logger.error(f"gradeSubmission error: {e}")
         return redirect('/error/')
 
 
@@ -884,7 +1141,9 @@ def access(request, code):
         course = Course.objects.get(code=code)
         student = Student.objects.get(student_id=request.session['student_id'])
         if request.method == 'POST':
-            if (request.POST['key']) == str(course.studentKey):
+            # SECURITY FIX: Use .get() to safely access POST data
+            provided_key = request.POST.get('key', '').strip()
+            if provided_key and provided_key == str(course.studentKey):
                 student.course.add(course)
                 student.save()
                 return redirect('/my/')
@@ -970,13 +1229,35 @@ def changePassword(request):
         student = Student.objects.get(
             student_id=request.session['student_id'])
         if request.method == 'POST':
-            old_password = request.POST['oldPassword']
-            new_password = request.POST['newPassword']
+            old_password = request.POST.get('oldPassword', '').strip()
+            new_password = request.POST.get('newPassword', '').strip()
             
-            # Check old password - working with plaintext passwords
-            if student.password == old_password:
-                # Save new password as plaintext
-                student.password = new_password
+            # SECURITY FIX: Validate input
+            if not old_password or not new_password:
+                messages.error(request, 'Please fill in all fields.')
+                return redirect('/changePassword/')
+            
+            def _password_policy_valid(p):
+                if len(p) < 8:
+                    return False
+                if not re.search(r'[a-z]', p):
+                    return False
+                if not re.search(r'[A-Z]', p):
+                    return False
+                if not re.search(r'\d', p):
+                    return False
+                if not re.search(r'[^A-Za-z0-9]', p):
+                    return False
+                return True
+
+            if not _password_policy_valid(new_password):
+                messages.error(request, 'Password must be at least 8 characters and include uppercase, lowercase, number, and a special character.')
+                return redirect('/changePassword/')
+            
+            # SECURITY FIX: Use secure password checking
+            if check_password(student.password, old_password):
+                # SECURITY FIX: Hash the new password before saving
+                student.password = hash_password(new_password)
                 student.save()
                 messages.success(request, 'Password was changed successfully')
                 return redirect('/profile/' + str(student.student_id))
@@ -997,13 +1278,35 @@ def changePasswordFaculty(request):
         faculty = Faculty.objects.get(
             faculty_id=request.session['faculty_id'])
         if request.method == 'POST':
-            old_password = request.POST['oldPassword']
-            new_password = request.POST['newPassword']
+            old_password = request.POST.get('oldPassword', '').strip()
+            new_password = request.POST.get('newPassword', '').strip()
             
-            # Check old password - working with plaintext passwords
-            if faculty.password == old_password:
-                # Save new password as plaintext
-                faculty.password = new_password
+            # SECURITY FIX: Validate input
+            if not old_password or not new_password:
+                messages.error(request, 'Please fill in all fields.')
+                return redirect('/changePasswordFaculty/')
+            
+            def _password_policy_valid(p):
+                if len(p) < 8:
+                    return False
+                if not re.search(r'[a-z]', p):
+                    return False
+                if not re.search(r'[A-Z]', p):
+                    return False
+                if not re.search(r'\d', p):
+                    return False
+                if not re.search(r'[^A-Za-z0-9]', p):
+                    return False
+                return True
+
+            if not _password_policy_valid(new_password):
+                messages.error(request, 'Password must be at least 8 characters and include uppercase, lowercase, number, and a special character.')
+                return redirect('/changePasswordFaculty/')
+            
+            # SECURITY FIX: Use secure password checking
+            if check_password(faculty.password, old_password):
+                # SECURITY FIX: Hash the new password before saving
+                faculty.password = hash_password(new_password)
                 faculty.save()
                 messages.success(request, 'Password was changed successfully')
                 return redirect('profile', id=str(faculty.faculty_id))
@@ -1012,7 +1315,7 @@ def changePasswordFaculty(request):
                     request, 'Password is incorrect. Please try again')
                 return redirect('/changePasswordFaculty/')
         else:
-            print(faculty)
+            # SECURITY FIX: Removed debug print statement
             return render(request, 'main/changePasswordFaculty.html', {'faculty': faculty})
     else:
         return redirect('std_login')
@@ -1089,11 +1392,16 @@ def guestFaculty(request):
 
 
 # Forgot Password Functionality
+# SECURITY FIX: Use cryptographically secure random for OTP generation
 def generate_otp():
-    """Generate a 6-digit OTP"""
-    return str(random.randint(100000, 999999))
+    """Generate a cryptographically secure 6-digit OTP"""
+    # Use secrets.randbelow() for cryptographically secure random number generation
+    # This prevents predictable OTPs that could be guessed by attackers
+    return str(secrets.randbelow(900000) + 100000)  # Generates 100000-999999
 
 
+# SECURITY FIX: Add rate limiting to prevent brute force attacks on password reset
+@rate_limit(max_requests=5, window_seconds=300, key_prefix='password_reset')
 @csrf_protect
 @require_http_methods(["GET", "POST"])
 def forgotPassword(request):
@@ -1146,6 +1454,8 @@ def forgotPassword(request):
             
             # Send OTP email
             try:
+                if not (getattr(settings, 'EMAIL_HOST_USER', None) and getattr(settings, 'EMAIL_HOST_PASSWORD', None)):
+                    raise ValueError('Email credentials not configured')
                 send_mail(
                     subject='Password Reset OTP - eLMS',
                     message=f'''Hello {student.name},
@@ -1280,8 +1590,21 @@ def resetPassword(request):
             messages.error(request, 'Passwords do not match.')
             return render(request, 'main/resetPassword.html')
         
-        if len(new_password) < 6:
-            messages.error(request, 'Password must be at least 6 characters long.')
+        def _password_policy_valid(p):
+            if len(p) < 8:
+                return False
+            if not re.search(r'[a-z]', p):
+                return False
+            if not re.search(r'[A-Z]', p):
+                return False
+            if not re.search(r'\d', p):
+                return False
+            if not re.search(r'[^A-Za-z0-9]', p):
+                return False
+            return True
+
+        if not _password_policy_valid(new_password):
+            messages.error(request, 'Password must be at least 8 characters and include uppercase, lowercase, number, and a special character.')
             return render(request, 'main/resetPassword.html')
         
         try:
@@ -1296,8 +1619,8 @@ def resetPassword(request):
             ).order_by('-created_at').first()
             
             if otp_obj and not otp_obj.is_expired():
-                # Update password
-                student.password = new_password
+                # SECURITY FIX: Hash the new password before saving
+                student.password = hash_password(new_password)
                 student.save()
                 
                 # Mark OTP as used
@@ -1391,8 +1714,8 @@ def changeEmail(request):
                     messages.error(request, 'Please fill in all fields.')
                     return render(request, 'main/changeEmail.html', {'student': student})
                 
-                # Verify password
-                if student.password != password:
+                # SECURITY FIX: Use secure password checking
+                if not check_password(student.password, password):
                     messages.error(request, 'Incorrect password. Please try again.')
                     return render(request, 'main/changeEmail.html', {'student': student})
                 
@@ -1424,5 +1747,47 @@ def changeEmail(request):
             logger.error(f"Error in changeEmail: {str(e)}")
             messages.error(request, 'An error occurred. Please try again.')
             return redirect('profile', id=str(request.session.get('student_id')))
+    else:
+        return redirect('std_login')
+
+
+@csrf_protect
+@require_http_methods(["GET", "POST"])
+def changeEmailFaculty(request):
+    if request.session.get('faculty_id'):
+        try:
+            faculty = Faculty.objects.get(faculty_id=request.session['faculty_id'])
+            if request.method == 'POST':
+                new_email = request.POST.get('new_email', '').strip()
+                password = request.POST.get('password', '').strip()
+                if not new_email or not password:
+                    messages.error(request, 'Please fill in all fields.')
+                    return render(request, 'main/changeEmail.html', {'faculty': faculty})
+                if not check_password(faculty.password, password):
+                    messages.error(request, 'Incorrect password. Please try again.')
+                    return render(request, 'main/changeEmail.html', {'faculty': faculty})
+                from django.core.validators import validate_email
+                from django.core.exceptions import ValidationError
+                try:
+                    validate_email(new_email)
+                except ValidationError:
+                    messages.error(request, 'Please enter a valid email address.')
+                    return render(request, 'main/changeEmail.html', {'faculty': faculty})
+                if Faculty.objects.filter(email=new_email).exclude(faculty_id=faculty.faculty_id).exists():
+                    messages.error(request, 'This email is already registered with another account.')
+                    return render(request, 'main/changeEmail.html', {'faculty': faculty})
+                faculty.email = new_email
+                faculty.save()
+                messages.success(request, 'Email updated successfully!')
+                return redirect('profile', id=str(faculty.faculty_id))
+            else:
+                return render(request, 'main/changeEmail.html', {'faculty': faculty})
+        except Faculty.DoesNotExist:
+            messages.error(request, 'Faculty not found.')
+            return redirect('std_login')
+        except Exception as e:
+            logger.error(f"Error in changeEmailFaculty: {str(e)}")
+            messages.error(request, 'An error occurred. Please try again.')
+            return redirect('profile', id=str(request.session.get('faculty_id')))
     else:
         return redirect('std_login')

@@ -52,6 +52,7 @@ urlpatterns = [
     path('verifyLoginOTP/', views.verifyLoginOTP, name='verifyLoginOTP'),
     path('saveEmail/', views.saveEmail, name='saveEmail'),
     path('changeEmail/', views.changeEmail, name='changeEmail'),
+    path('changeEmailFaculty/', views.changeEmailFaculty, name='changeEmailFaculty'),
     path('search/', views.search, name='search'),
     path('error/', views.error, name='error'),
 ]

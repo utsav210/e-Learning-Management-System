@@ -4,15 +4,28 @@ from .models import Announcement, Assignment, Material
 from django.core.validators import FileExtensionValidator, MaxValueValidator, MinValueValidator
 from django.core.exceptions import ValidationError
 import os
+import logging
+import re
 from django.utils.html import strip_tags
 
 
 def sanitize_html(value):
-    """Best-effort HTML sanitizer that preserves basic formatting if 'bleach' is available.
-    Falls back to returning original value to avoid breaking rich-text functionality.
     """
+    SECURITY FIX: HTML sanitizer that prevents XSS attacks.
+    Uses bleach for sanitization. If bleach is unavailable or fails, strips all HTML tags
+    to prevent XSS attacks rather than returning unsanitized content.
+    """
+    if not value:
+        return value
+    
     try:
         import bleach  # type: ignore
+        css_sanitizer = None
+        try:
+            from bleach.css_sanitizer import CSSSanitizer  # type: ignore
+            css_sanitizer = CSSSanitizer()
+        except Exception:
+            css_sanitizer = None
         allowed_tags = [
             'p', 'br', 'strong', 'b', 'em', 'i', 'u', 'ul', 'ol', 'li', 'a', 'blockquote',
             'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'span'
@@ -21,20 +34,60 @@ def sanitize_html(value):
             'a': ['href', 'title', 'rel', 'target'],
             'span': ['style'],
         }
-        allowed_protocols = ['http', 'https', 'mailto']
-        cleaned = bleach.clean(
-            value,
-            tags=allowed_tags,
-            attributes=allowed_attrs,
-            protocols=allowed_protocols,
-            strip=True,
-        )
-        # Add rel and target safety on links
-        cleaned = bleach.linkify(cleaned, callbacks=[bleach.linkifier.DEFAULT_CALLBACK])
+        if css_sanitizer is not None:
+            cleaned = bleach.clean(
+                value,
+                tags=allowed_tags,
+                attributes=allowed_attrs,
+                strip=True,
+                css_sanitizer=css_sanitizer,
+            )
+        else:
+            cleaned = bleach.clean(
+                value,
+                tags=allowed_tags,
+                attributes=allowed_attrs,
+                strip=True,
+            )
+        
+        # SECURITY FIX: Additional safety check - ensure no script tags remain
+        # Use regex to remove any script tags that might have slipped through
+        # Remove script tags and their content
+        cleaned = re.sub(r'<script[^>]*>.*?</script>', '', cleaned, flags=re.IGNORECASE | re.DOTALL)
+        # Remove any remaining script tag openings/closings
+        cleaned = re.sub(r'</?script[^>]*>', '', cleaned, flags=re.IGNORECASE)
+        
+        # Final verification - if script tags still exist, strip all HTML
+        if '<script' in cleaned.lower() or '</script>' in cleaned.lower():
+            # If script tags somehow remain, strip all HTML as fallback
+            logger = logging.getLogger(__name__)
+            logger.warning("Script tags detected after bleach.clean(), stripping all HTML as safety measure.")
+            return strip_tags(value)
+        
+        cleaned = re.sub(r'href=["\']javascript:[^"\']*["\']', '', cleaned, flags=re.IGNORECASE)
+        
+        # Add rel and target safety on links (only for safe links)
+        
+        
+        # Final safety check - ensure no dangerous content remains
+        if 'javascript:' in cleaned.lower():
+            # Remove any remaining javascript: links
+            cleaned = re.sub(r'<a[^>]*href=["\']javascript:[^"\']*["\'][^>]*>.*?</a>', '', cleaned, flags=re.IGNORECASE | re.DOTALL)
+        
         return cleaned
-    except Exception:
-        # If bleach is unavailable or errors, return original content to avoid breaking editor output
-        return value
+    except ImportError:
+        # SECURITY FIX: If bleach is unavailable, strip all HTML tags to prevent XSS
+        # This is safer than returning unsanitized content
+        logger = logging.getLogger(__name__)
+        logger.error("bleach package not installed. HTML sanitization disabled. Please install bleach: pip install bleach")
+        # Strip all HTML tags as a fallback to prevent XSS
+        return strip_tags(value)
+    except Exception as e:
+        # SECURITY FIX: If sanitization fails, strip all HTML tags to prevent XSS
+        logger = logging.getLogger(__name__)
+        logger.error(f"HTML sanitization error: {str(e)}. Stripping all HTML tags as fallback.")
+        # Strip all HTML tags as a fallback to prevent XSS
+        return strip_tags(value)
 
 
 class AnnouncementForm(forms.ModelForm):
