@@ -22,24 +22,72 @@ wheels/
 
 # Django
 *.log
-local_settings.py
 db.sqlite3
-db.sqlite3-journal
-media
+db_production.sqlite3
+media/
+staticfiles/
+mediafiles/
 
 # Virtual Environment
-venv/
-env/
-ENV/
-.env
 myenv/
+venv/
+ENV/
+env/
+.env
 
 # IDE
-.idea/
 .vscode/
+.idea/
 *.swp
 *.swo
+*~
 
 # OS
 .DS_Store
 Thumbs.db
+
+# Test Results & Reports
+test_results*.txt
+deployment_check.txt
+security_scan_results.txt
+SECURITY_TEST_REPORT.txt
+
+# Generated Documentation (Keep SSDLC docs, ignore temporary/updated versions)
+*_UPDATED.docx
+ACTUAL_TEST_RESULTS_PHASE4.md
+
+# Security Scanner
+security_scanner.py
+
+# Update Scripts (Keep original generators, ignore update scripts)
+update_phase*.py
+
+# Phase 5: Deployment Artifacts
+DEPLOYMENT_REPORT.txt
+network_analysis/*.json
+network_analysis/*.pcap
+recon/*.json
+recon/*.html
+logs/*.log
+logs/*.json
+ids_alerts.json
+blocked_ips.log
+security_alerts.log
+traffic_report_*.json
+recon_report_*.json
+recon_report_*.html
+
+# Keep important SSDLC documentation
+!SSDLC_Phase1_Phase2_Analysis_Design.docx
+!SSDLC_Phase3_Implementation.docx
+!SSDLC_Phase4_Testing.docx
+!generate_phase3_docs.py
+!generate_phase4_docs.py
+!generate_ssdlc_docs.py
+
+# Virtual Environment Config
+pyvenv.cfg
+
+# Generated Reports
+SECURITY_FIXES_REPORT.docx
+GITIGNORE_UPDATE_SUMMARY.md
